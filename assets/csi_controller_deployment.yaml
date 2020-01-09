@@ -1,0 +1,23 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-snapshot-controller
+  namespace: openshift-csi-snapshot-controller
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: csi-snapshot-controller
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: csi-snapshot-controller
+    spec:
+      serviceAccount: csi-snapshot-controller-sa
+      containers:
+        - name: csi-snapshot-controller
+          image: "quay.io/k8scsi/snapshot-controller:v2.0.0-rc2"
+          args:
+            - "--v=5"
+          imagePullPolicy: Always

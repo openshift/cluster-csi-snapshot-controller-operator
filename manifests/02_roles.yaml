@@ -1,0 +1,30 @@
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-snapshot-controller-operator-leaderelection
+  namespace: openshift-csi-snapshot-controller-operator
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-snapshot-controller-operator-leaderelection
+  namespace: openshift-csi-snapshot-controller-operator
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: csi-snapshot-controller-operator
+    namespace: openshift-csi-snapshot-controller-operator
+roleRef:
+  kind: Role
+  name: csi-snapshot-controller-operator-leaderelection
+  apiGroup: rbac.authorization.k8s.io
