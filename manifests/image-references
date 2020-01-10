@@ -1,0 +1,12 @@
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+spec:
+  tags:
+  - name: csi-snapshot-controller-operator
+    from:
+      kind: DockerImage
+      name: openshift/origin-csi-snapshot-controller-operator:latest
+  - name: csi-snapshot-controller
+    from:
+      kind: DockerImage
+      name: openshift/origin-csi-snapshot-controller:latest
