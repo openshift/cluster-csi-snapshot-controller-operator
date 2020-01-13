@@ -10,6 +10,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operator"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/version"
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
+
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 )
@@ -39,6 +43,8 @@ func NewCSISnapshotControllerOperatorCommand() *cobra.Command {
 			os.Exit(1)
 		},
 	}
+
+	cmd.AddCommand(controllercmd.NewControllerCommandConfig("cluster", version.Get(), operator.RunOperator).NewCommand())
 
 	return cmd
 }
