@@ -12,7 +12,8 @@ BINDATA=pkg/generated/bindata.go
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell go env GOPATH)))
 GOBINDATA_BIN=$(FIRST_GOPATH)/bin/go-bindata
 
-all: build
+all:
+	go build -a -o bin/cluster-csi-snapshot-controller-operator cmd/csi-snapshot-controller-operator/main.go
 
 build: generate
 	$(GO_BUILD_RECIPE)
