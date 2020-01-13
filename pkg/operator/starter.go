@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -17,8 +18,8 @@ const (
 	resync = 20 * time.Minute
 )
 
-func RunOperator(ctx *controllercmd.ControllerContext) error {
-	configClient, err := csisnapshotconfigclient.NewForConfig(ctx.KubeConfig)
+func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
+	configClient, err := csisnapshotconfigclient.NewForConfig(controllerConfig.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -37,7 +38,7 @@ func RunOperator(ctx *controllercmd.ControllerContext) error {
 	operator := NewCSISnapshotControllerOperator(
 		*operatorClient,
 		versionGetter,
-		ctx.EventRecorder,
+		controllerConfig.EventRecorder,
 	)
 
 	/*
