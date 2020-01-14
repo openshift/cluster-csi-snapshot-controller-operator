@@ -1,35 +1,52 @@
-#IMG ?= openshift/origin-cluster-csi-snapshot-controller-operator:latest
+all: build
+.PHONY: all
 
-PACKAGE=github.com/openshift/cluster-csi-snapshot-controller-operator
-MAIN_PACKAGE=$(PACKAGE)/cmd/csi-snapshot-controller-manager
+# Include the library makefile
+include $(addprefix ./vendor/github.com/openshift/library-go/alpha-build-machinery/make/, \
+	golang.mk \
+	targets/openshift/deps-gomod.mk \
+	targets/openshift/images.mk \
+	targets/openshift/bindata.mk \
+)
 
-BIN=$(lastword $(subst /, ,$(MAIN_PACKAGE)))
+# Run core verification and all self contained tests.
+#
+# Example:
+#   make check
+check: | verify test-unit
+.PHONY: check
 
-GOOS=linux
-GO_BUILD_RECIPE=GOOS=$(GOOS) CGO_ENABLED=0 go build -o $(BIN) $(MAIN_PACKAGE)
+IMAGE_REGISTRY?=registry.svc.ci.openshift.org
 
-BINDATA=pkg/generated/bindata.go
-FIRST_GOPATH := $(firstword $(subst :, ,$(shell go env GOPATH)))
-GOBINDATA_BIN=$(FIRST_GOPATH)/bin/go-bindata
+# This will call a macro called "build-image" which will generate image specific targets based on the parameters:
+# $0 - macro name
+# $1 - target name
+# $2 - image ref
+# $3 - Dockerfile path
+# $4 - context directory for image build
+# It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
+$(call build-image,ocp-cluster-csi-snapshot-operator,$(IMAGE_REGISTRY)/ocp/4.4:cluster-csi-snapshot-operator,./Dockerfile.rhel7,.)
 
-all:
-	go build -a -o bin/cluster-csi-snapshot-controller-operator cmd/csi-snapshot-controller-operator/main.go
-
-build: generate
-	$(GO_BUILD_RECIPE)
-
-generate: $(GOBINDATA_BIN)
-	$(GOBINDATA_BIN) -nometadata -pkg generated -o $(BINDATA) assets/...
-
-$(GOBINDATA_BIN):
-	go build -o $(GOBINDATA_BIN) ./vendor/github.com/jteeuwen/go-bindata/go-bindata
-
-test:
-	go test ./pkg/...
-
-container: build test verify
-	docker build . -t $(IMG)
+# generate bindata targets
+# $0 - macro name
+# $1 - target suffix
+# $2 - input dirs
+# $3 - prefix
+# $4 - pkg
+# $5 - output
+$(call add-bindata,generated,./assets/...,assets,generated,pkg/generated/bindata.go)
 
 clean:
-	go clean
-	rm -f $(BIN)
+	$(RM) csi-snapshot-controller-operator
+.PHONY: clean
+
+GO_TEST_PACKAGES :=./pkg/... ./cmd/...
+
+# Run e2e tests.
+#
+# Example:
+#   make test-e2e
+test-e2e: GO_TEST_PACKAGES :=./test/e2e/...
+test-e2e: GO_TEST_FLAGS += -v
+test-e2e: test-unit
+.PHONY: test-e2e

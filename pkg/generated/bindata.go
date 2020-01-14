@@ -10,36 +10,13 @@
 package generated
 
 import (
-	"bytes"
-	"compress/gzip"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
-
-func bindataRead(data []byte, name string) ([]byte, error) {
-	gz, err := gzip.NewReader(bytes.NewBuffer(data))
-	if err != nil {
-		return nil, fmt.Errorf("Read %q: %v", name, err)
-	}
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, gz)
-	clErr := gz.Close()
-
-	if err != nil {
-		return nil, fmt.Errorf("Read %q: %v", name, err)
-	}
-	if clErr != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
 
 type asset struct {
 	bytes []byte
@@ -72,102 +49,210 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _assetsController_clusterrolesYaml = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xcc\x55\x4d\xaf\xd3\x40\x0c\xbc\xe7\x57\x58\xe1\xda\xf4\x89\x1b\xca\x0d\x38\x70\x7f\x48\x5c\x10\x07\x77\xe3\x26\x4b\x37\xde\xc8\xf6\x16\xc4\xaf\x47\xbb\x4d\x5f\x41\xe9\x97\xca\x3b\x70\xaa\x94\xda\x33\x1e\x7b\x35\xb3\xf3\xdc\xb5\xf0\x31\x24\x35\x92\xe7\x18\xa8\xc2\xc9\x7f\x21\x51\x1f\xb9\x05\xd9\xa0\x5b\x63\xb2\x21\x8a\xff\x85\xe6\x23\xaf\x77\xef\x74\xed\xe3\xd3\xfe\x6d\x35\x92\x61\x87\x86\x6d\x05\xf0\x06\x84\x18\x47\x02\xbf\x05\x1b\x48\x08\x50\x08\x5c\xe4\x6d\xf0\xce\xb4\x02\xc8\xff\xb6\xe0\xd4\x37\xca\x38\xe9\x10\xad\x71\x91\x4d\x62\x08\x24\x8d\x24\x66\x92\xb9\x4c\x27\x74\xd4\x42\x9c\x88\x75\xf0\x5b\x6b\x2e\x74\x55\x00\x01\x37\x14\x34\x4f\x00\xb0\x4b\x1b\x12\x26\xa3\x32\xa0\x3b\x48\x6a\x94\x64\xef\x33\x5c\x6d\x92\xa8\x2e\x95\xd8\x75\x91\x47\x64\xec\x49\xd6\x7f\xb7\x8d\xb1\xa3\x16\x9e\xc9\x45\x76\x3e\x50\x25\x29\x50\xc1\x6f\x00\x27\xff\x49\x62\x9a\xb4\x85\xaf\x75\xfd\xad\x20\x09\x69\x4c\xe2\xa8\x7c\x9b\xf2\xda\xd4\x88\x6d\x1f\x43\x1a\x49\xe7\xa2\x3d\xc9\xa6\x14\xf4\x64\xf5\x0a\xea\xe0\xb5\xfc\xfe\x40\x73\x43\xa9\x79\x00\xdc\x05\xf4\xe3\x7d\x0c\x2b\xa8\xd3\xd4\xa1\xd1\x39\x2e\xb5\x28\xd8\xd3\x7c\xd7\x73\xcc\x73\x85\x0b\xa8\xfa\xba\x9a\x68\x4f\x6c\x0b\xc4\xc5\xf0\x4e\x28\x0f\x7f\x92\xb1\x82\x7a\xba\xc4\x73\x7c\x27\xeb\xdb\xc2\xe6\x2b\xcd\x0d\xff\xa8\xef\x71\xde\xc8\x76\x6e\x0d\x27\xd5\x37\x8e\xba\x82\xba\xa3\x40\x17\xce\xfb\xe8\x58\xaf\xf1\xb4\x1e\xe6\x7e\x52\x43\x4b\x8b\x11\x2e\x53\xe1\xe4\xe9\xa7\x11\x67\xdb\xd2\x2b\x3c\x2e\xa9\xc5\xf1\xf8\xa9\xa3\xad\x67\x9f\x6d\xed\xca\xf6\x17\x82\xe7\x65\x9f\x0e\xf3\x32\x56\xd5\x34\x4d\xb5\x70\xd4\x0f\x9e\x3b\xcf\xfd\x63\xc6\x7a\xc3\x36\xb3\x61\xff\x7f\xa6\xa9\x69\xf3\x9d\x9c\xcd\xbe\x79\x58\xc8\xe7\x03\xe4\x7b\xe7\x62\x62\x2b\x88\x57\xb5\xbd\x54\xdc\x2d\x2c\x2f\xe3\x99\xb6\x99\x74\x99\x6a\x39\xa2\xdc\x80\xdc\x53\xce\xa7\x02\x0c\x18\x34\x42\x09\xab\x43\x6a\xfd\xd9\x00\x3d\x99\xce\xa1\xd6\xdd\x1f\x5f\xc7\x47\x79\xe5\xc2\xbf\x03\x00\x00\xff\xff\x11\x9d\x5c\xfd\x72\x07\x00\x00")
+var _controller_clusterrolesYaml = []byte(`kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  # rename if there are conflicts
+  name: csi-snapshot-controller-runner
+  namespace: openshift-csi-snapshot-controller
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["create", "get", "list", "watch", "update", "delete"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots/status"]
+    verbs: ["update"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["create", "list", "watch", "delete", "get", "update"]
 
-func assetsController_clusterrolesYamlBytes() ([]byte, error) {
-	return bindataRead(
-		_assetsController_clusterrolesYaml,
-		"assets/controller_clusterroles.yaml",
-	)
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-snapshot-controller-role
+  namespace: openshift-csi-snapshot-controller
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: csi-snapshot-controller
+    namespace: openshift-csi-snapshot-controller
+roleRef:
+  kind: ClusterRole
+  # change the name also here if the ClusterRole gets renamed
+  name: csi-snapshot-controller-runner
+  apiGroup: rbac.authorization.k8s.io`)
+
+func controller_clusterrolesYamlBytes() ([]byte, error) {
+	return _controller_clusterrolesYaml, nil
 }
 
-func assetsController_clusterrolesYaml() (*asset, error) {
-	bytes, err := assetsController_clusterrolesYamlBytes()
+func controller_clusterrolesYaml() (*asset, error) {
+	bytes, err := controller_clusterrolesYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/controller_clusterroles.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "controller_clusterroles.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _assetsController_namespaceYaml = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x6c\xcb\x31\x12\x02\x21\x0c\x05\xd0\x9e\x53\x64\xe8\xd1\xb1\xe5\x10\x96\xf6\x91\xfd\xba\x19\x21\x61\x48\xd6\xf3\x3b\x56\x36\xf6\xef\xf1\x94\x1b\x96\x8b\x69\xa5\xf7\x25\xbd\x44\xb7\x4a\x57\x1e\xf0\xc9\x0d\x69\x20\x78\xe3\xe0\x9a\x88\x94\x07\x2a\xd9\x84\xfa\x2e\x8f\x28\xcd\xa5\xb8\xf2\xf4\xdd\xa2\x34\xd3\x58\xd6\x3b\x56\x22\x62\x55\x0b\x0e\x31\xf5\x6f\xa4\x5f\x3a\x89\x9d\xd5\x36\x14\x47\x47\x0b\x5b\x95\x72\x4e\x44\x9d\xef\xe8\xff\x70\xeb\x87\x07\x56\x19\xa6\x12\xb6\x44\x9f\x95\x72\xac\x03\x39\x7d\x02\x00\x00\xff\xff\xf6\x86\xe9\x21\xbb\x00\x00\x00")
+var _controller_namespaceYaml = []byte(`apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-csi-snapshot-controller
+  annotations:
+    openshift.io/node-selector: ""
+  labels:
+    openshift.io/cluster-monitoring: "true"
+`)
 
-func assetsController_namespaceYamlBytes() ([]byte, error) {
-	return bindataRead(
-		_assetsController_namespaceYaml,
-		"assets/controller_namespace.yaml",
-	)
+func controller_namespaceYamlBytes() ([]byte, error) {
+	return _controller_namespaceYaml, nil
 }
 
-func assetsController_namespaceYaml() (*asset, error) {
-	bytes, err := assetsController_namespaceYamlBytes()
+func controller_namespaceYaml() (*asset, error) {
+	bytes, err := controller_namespaceYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/controller_namespace.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "controller_namespace.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _assetsController_rolesYaml = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xe4\x53\x3d\xaf\xd4\x30\x10\xec\xfd\x2b\x56\xa9\x71\x10\x1d\x72\x07\x0d\xfd\x21\xd1\xa0\x57\x6c\xec\x79\x17\x73\x8e\x37\xda\xb5\x0f\x89\x5f\x8f\xe2\xe3\xe3\x28\x38\x41\xfd\xba\xd1\x6a\x76\x26\xb3\x13\x5f\x72\x4d\x81\x4e\x52\xe0\x78\xcf\x9f\xa0\x96\xa5\x06\xd2\x85\xe3\xcc\xbd\xad\xa2\xf9\x1b\xb7\x2c\x75\xbe\xbc\xb5\x39\xcb\xeb\xeb\x1b\xb7\xa1\x71\xe2\xc6\xc1\x11\x55\xde\x10\x28\x5a\xf6\x56\x79\xb7\x55\x9a\x8f\x52\x9b\x4a\x29\x50\x5f\xc0\x09\x8a\x82\x78\x48\xfc\xa0\xdb\xce\x11\x81\x64\x47\xb5\x35\x3f\x37\xff\x97\x6d\x47\x54\x78\x41\xb1\xc3\x87\xe8\xd2\x17\x68\x45\xc3\xf8\x8c\x58\xba\x35\xa8\x37\xe8\x35\x1f\x72\x53\xd3\x8e\x69\x30\x39\x25\xa9\x1b\x57\x3e\x43\xe7\x3f\xd7\x36\x49\x08\x74\x42\x94\x1a\x73\x81\xd3\x5e\x60\xc1\x79\xe2\x3d\x7f\x50\xe9\xbb\x05\xfa\x3c\x45\x11\x4d\xb9\xde\xe7\x9e\x9e\x1c\x91\xc2\xa4\x6b\xc4\x20\x15\xb0\xc1\xc6\xfc\x0a\x5d\xc6\xec\x8c\x36\xbd\xa2\xe9\x2b\xb7\xb8\x1e\xa0\x64\x1b\x83\x84\x82\x86\x03\xf5\x3d\xf1\x0d\x45\xc5\x81\x9e\x9c\xf3\xde\xbb\xdf\x3d\xbc\xcf\x35\xe5\x7a\x7e\x91\x75\x58\x5f\xbe\x20\xb6\x61\xe1\xe9\x76\x93\x8f\x37\xc9\x77\x31\x4a\xaf\x6d\x28\x3e\x4c\xf9\x8b\xf1\xcf\xc1\x54\x0a\x4e\x78\x3e\x4c\xef\x9e\xc3\x7f\x1f\xf3\xe7\x2f\xf4\xa0\xae\xef\x01\x00\x00\xff\xff\xa9\x85\x3b\xe1\x6e\x03\x00\x00")
+var _controller_rolesYaml = []byte(`kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-snapshot-controller-leaderelection
+  namespace: openshift-csi-snapshot-controller
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "delete", "update", "create"]
 
-func assetsController_rolesYamlBytes() ([]byte, error) {
-	return bindataRead(
-		_assetsController_rolesYaml,
-		"assets/controller_roles.yaml",
-	)
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-snapshot-controller-leaderelection
+  namespace: openshift-csi-snapshot-controller
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: csi-snapshot-controller
+    namespace: openshift-csi-snapshot-controller
+roleRef:
+  kind: Role
+  name: csi-snapshot-controller-leaderelection
+  apiGroup: rbac.authorization.k8s.io`)
+
+func controller_rolesYamlBytes() ([]byte, error) {
+	return _controller_rolesYaml, nil
 }
 
-func assetsController_rolesYaml() (*asset, error) {
-	bytes, err := assetsController_rolesYamlBytes()
+func controller_rolesYaml() (*asset, error) {
+	bytes, err := controller_rolesYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/controller_roles.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "controller_roles.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _assetsController_serviceaccountYaml = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x74\x8e\xb1\x4e\x83\x31\x0c\x06\xf7\x3c\x85\xd5\xfd\x2f\x62\xcd\xc6\x2b\x80\xc4\xee\x3a\x1f\xd4\x6a\x62\x47\xb1\xd3\xe7\x47\x05\x16\x06\xf6\xbb\xd3\xf1\xd4\x77\xac\x50\xb7\x4a\xf7\xe7\x72\x53\x6b\x95\xde\xb0\xee\x2a\x78\x11\xf1\x6d\x59\x06\x92\x1b\x27\xd7\x42\x64\x3c\x50\x49\x42\x8f\x30\x9e\x71\xf5\x3c\xc4\x2d\x97\xf7\x8e\x75\x04\xff\x22\x31\x59\x50\xc9\x27\x2c\xae\xfa\x91\xc7\x3f\x46\x21\xea\x7c\x41\x8f\x47\x9b\xe8\xb6\x2f\x58\x86\x44\x9c\xd5\x9f\xa4\xef\xc8\x47\xf5\x67\xa7\xd2\x29\xd7\xc6\xe9\x9b\xe4\xd6\xdc\x06\x1b\x7f\x62\x9d\xff\x6a\xc3\x1b\x2a\xbd\x42\xdc\x44\x3b\xca\x57\x00\x00\x00\xff\xff\xe2\x66\x3a\x94\xe3\x00\x00\x00")
+var _controller_serviceaccountYaml = []byte(`apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-snapshot-controller-sa
+  namespace: openshift-csi-snapshot-controller
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+`)
 
-func assetsController_serviceaccountYamlBytes() ([]byte, error) {
-	return bindataRead(
-		_assetsController_serviceaccountYaml,
-		"assets/controller_serviceaccount.yaml",
-	)
+func controller_serviceaccountYamlBytes() ([]byte, error) {
+	return _controller_serviceaccountYaml, nil
 }
 
-func assetsController_serviceaccountYaml() (*asset, error) {
-	bytes, err := assetsController_serviceaccountYamlBytes()
+func controller_serviceaccountYaml() (*asset, error) {
+	bytes, err := controller_serviceaccountYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/controller_serviceaccount.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "controller_serviceaccount.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _assetsCsi_controller_deploymentYaml = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x84\x90\x4f\x6b\x1b\x41\x0c\xc5\xef\xfb\x29\xc4\xde\xc7\x76\x5d\x0a\x65\xa0\x07\x43\x8f\x3d\xf8\x50\x7a\x57\x65\xc5\x16\xd6\xfc\xc9\x48\xbb\x61\xbf\x7d\xd8\xd8\x86\x4d\x88\x63\x9d\x86\x79\xf3\xde\xef\x8d\xce\x92\x0f\x11\x7e\x73\xd5\x32\x25\xce\xde\x61\x95\x7f\xdc\x4c\x4a\x8e\x80\xb5\xda\x7a\xfc\xd6\x25\x76\x3c\xa0\x63\xec\x00\x32\x26\x8e\x40\x26\xc1\x32\x56\x3b\x15\x0f\x54\xb2\xb7\xa2\xca\xed\xaa\x5b\x45\xe2\x08\xa5\x72\xb6\x93\x3c\x79\xb8\xf7\xdc\x2a\xd3\x1c\xda\xb8\xaa\x10\x5a\x84\xef\x1d\x80\xb1\x32\x79\x69\xb3\x02\x90\xd0\xe9\xf4\x07\xff\xb3\xda\xe5\x02\xe6\x5e\x5f\x55\x70\x4e\x55\xd1\xf9\xea\x5f\x94\x9f\x87\x1a\xa3\x4b\xc9\x7f\x25\xb1\x39\xa6\x1a\x21\x0f\xaa\x57\x55\xdf\x81\x1e\xa2\x00\x6e\x5f\x78\x3b\x73\x1b\x85\x78\x47\x54\x86\xec\x77\x7d\xc1\xf0\xd6\xa5\x64\x47\xc9\xdc\x16\xc4\xf0\x70\xc5\xb7\x91\x84\x47\x8e\xd0\x3f\x0f\x38\xad\xa4\xac\xcf\x3f\x8d\x4c\xd6\x9f\x98\xe2\xb8\x5d\x6d\x56\x9b\xd0\x68\xdb\x2f\x02\xb0\x1d\x17\xe0\x0b\xbc\x0f\x61\xfc\xf5\xa3\xff\x88\xd9\x0f\xaa\xfb\xa2\x42\x53\x84\x9d\xbe\xe0\x64\xdd\x6b\x00\x00\x00\xff\xff\x56\xae\xa1\xfd\x3b\x02\x00\x00")
+var _csi_controller_deploymentYaml = []byte(`kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-snapshot-controller
+  namespace: openshift-csi-snapshot-controller
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: csi-snapshot-controller
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: csi-snapshot-controller
+    spec:
+      serviceAccount: csi-snapshot-controller-sa
+      containers:
+        - name: csi-snapshot-controller
+          image: "quay.io/k8scsi/snapshot-controller:v2.0.0-rc2"
+          args:
+            - "--v=5"
+          imagePullPolicy: Always
+`)
 
-func assetsCsi_controller_deploymentYamlBytes() ([]byte, error) {
-	return bindataRead(
-		_assetsCsi_controller_deploymentYaml,
-		"assets/csi_controller_deployment.yaml",
-	)
+func csi_controller_deploymentYamlBytes() ([]byte, error) {
+	return _csi_controller_deploymentYaml, nil
 }
 
-func assetsCsi_controller_deploymentYaml() (*asset, error) {
-	bytes, err := assetsCsi_controller_deploymentYamlBytes()
+func csi_controller_deploymentYaml() (*asset, error) {
+	bytes, err := csi_controller_deploymentYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/csi_controller_deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "csi_controller_deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -224,11 +309,11 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"assets/controller_clusterroles.yaml": assetsController_clusterrolesYaml,
-	"assets/controller_namespace.yaml": assetsController_namespaceYaml,
-	"assets/controller_roles.yaml": assetsController_rolesYaml,
-	"assets/controller_serviceaccount.yaml": assetsController_serviceaccountYaml,
-	"assets/csi_controller_deployment.yaml": assetsCsi_controller_deploymentYaml,
+	"controller_clusterroles.yaml":   controller_clusterrolesYaml,
+	"controller_namespace.yaml":      controller_namespaceYaml,
+	"controller_roles.yaml":          controller_rolesYaml,
+	"controller_serviceaccount.yaml": controller_serviceaccountYaml,
+	"csi_controller_deployment.yaml": csi_controller_deploymentYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -270,14 +355,13 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
-	"assets": &bintree{nil, map[string]*bintree{
-		"controller_clusterroles.yaml": &bintree{assetsController_clusterrolesYaml, map[string]*bintree{}},
-		"controller_namespace.yaml": &bintree{assetsController_namespaceYaml, map[string]*bintree{}},
-		"controller_roles.yaml": &bintree{assetsController_rolesYaml, map[string]*bintree{}},
-		"controller_serviceaccount.yaml": &bintree{assetsController_serviceaccountYaml, map[string]*bintree{}},
-		"csi_controller_deployment.yaml": &bintree{assetsCsi_controller_deploymentYaml, map[string]*bintree{}},
-	}},
+	"controller_clusterroles.yaml":   {controller_clusterrolesYaml, map[string]*bintree{}},
+	"controller_namespace.yaml":      {controller_namespaceYaml, map[string]*bintree{}},
+	"controller_roles.yaml":          {controller_rolesYaml, map[string]*bintree{}},
+	"controller_serviceaccount.yaml": {controller_serviceaccountYaml, map[string]*bintree{}},
+	"csi_controller_deployment.yaml": {csi_controller_deploymentYaml, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory
@@ -326,4 +410,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-
