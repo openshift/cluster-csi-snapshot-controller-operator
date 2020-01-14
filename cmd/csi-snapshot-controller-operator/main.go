@@ -44,7 +44,11 @@ func NewCSISnapshotControllerOperatorCommand() *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(controllercmd.NewControllerCommandConfig("cluster", version.Get(), operator.RunOperator).NewCommand())
+	cmd2 := controllercmd.NewControllerCommandConfig("csi-snapshot-controller-operator", version.Get(), operator.RunOperator).NewCommand()
+	cmd2.Use = "start"
+	cmd2.Short = "Start the CSI Snapshot Controller Operator"
+
+	cmd.AddCommand(cmd2)
 
 	return cmd
 }

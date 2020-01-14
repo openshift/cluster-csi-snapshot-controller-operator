@@ -6,3 +6,13 @@ metadata:
     openshift.io/node-selector: ""
   labels:
     openshift.io/cluster-monitoring: "true"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-csi-snapshot-controller
+  annotations:
+    openshift.io/node-selector: ""
+  labels:
+    openshift.io/cluster-monitoring: "true"

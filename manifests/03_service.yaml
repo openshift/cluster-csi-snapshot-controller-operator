@@ -1,0 +1,20 @@
+# TODO: check if it is needed (and what's missing to get prometheus metrics)
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: serving-cert
+  labels:
+    app: csi-snapshot-controller-operator
+  name: metrics
+  namespace: openshift-csi-snapshot-controller-operator
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    app: csi-snapshot-controller-operator
+  sessionAffinity: None
+  type: ClusterIP
