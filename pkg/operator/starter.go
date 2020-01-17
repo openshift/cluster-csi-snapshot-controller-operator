@@ -58,13 +58,14 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	operator := NewCSISnapshotControllerOperator(
 		*operatorClient,
 		ctrlctx.APIExtInformerFactory.Apiextensions().V1beta1().CustomResourceDefinitions(),
-		ctrlctx.ClientBuilder.APIExtClientOrDie(clusterOperatorName),
+		ctrlctx.ClientBuilder.APIExtClientOrDie(targetName),
+		ctrlctx.ClientBuilder.KubeClientOrDie(targetName),
 		versionGetter,
 		controllerConfig.EventRecorder,
 	)
 
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
-		clusterOperatorName,
+		targetName,
 		[]configv1.ObjectReference{
 			{Resource: "namespaces", Name: targetNamespace},
 			{Resource: "namespaces", Name: targetNameSpaceController},
@@ -78,7 +79,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	logLevelController := loglevel.NewClusterOperatorLoggingController(operatorClient, controllerConfig.EventRecorder)
 	// TODO remove this controller once we support Removed
-	managementStateController := management.NewOperatorManagementStateController(clusterOperatorName, operatorClient, controllerConfig.EventRecorder)
+	managementStateController := management.NewOperatorManagementStateController(targetName, operatorClient, controllerConfig.EventRecorder)
 	management.SetOperatorNotRemovable()
 
 	klog.Info("Starting the Informers.")
@@ -87,6 +88,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}{
 		csiConfigInformers,
 		configInformers,
+		ctrlctx.APIExtInformerFactory,
 	} {
 		informer.Start(ctx.Done())
 	}
@@ -102,7 +104,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		go controller.Run(ctx, 1)
 	}
 	klog.Info("Starting the operator.")
-	go operator.Run(ctx.Done())
+	go operator.Run(1, ctx.Done())
 
 	<-ctx.Done()
 

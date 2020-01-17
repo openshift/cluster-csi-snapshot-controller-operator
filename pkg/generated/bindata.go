@@ -94,7 +94,6 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: (devel)
     api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/139"
-  creationTimestamp: null
   name: volumesnapshotclasses.snapshot.storage.k8s.io
 spec:
   group: snapshot.storage.k8s.io
@@ -181,7 +180,6 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: (devel)
     api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/139"
-  creationTimestamp: null
   name: volumesnapshotcontents.snapshot.storage.k8s.io
 spec:
   group: snapshot.storage.k8s.io
@@ -398,7 +396,6 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: (devel)
     api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/139"
-  creationTimestamp: null
   name: volumesnapshots.snapshot.storage.k8s.io
 spec:
   group: snapshot.storage.k8s.io
