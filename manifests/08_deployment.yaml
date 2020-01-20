@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: openshift-csi-snapshot-controller-operator
+  name: csi-snapshot-controller-operator
+  labels:
+    app: csi-snapshot-controller-operator
+  annotations:
+    config.openshift.io/inject-proxy: operator
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-snapshot-controller-operator
+  template:
+    metadata:
+      name: csi-snapshot-controller-operator
+      labels:
+        app: csi-snapshot-controller-operator
+    spec:
+      serviceAccountName: csi-snapshot-controller-operator
+      containers:
+      - name: operator
+        # TODO: fix to official image
+        image: quay.io/jsafrane/csi-snapshot-operator:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: 50Mi
+            cpu: 10m
+        args: [ "start", "-v", "5" , "--config=/var/run/configmaps/config/operator-config.yaml"]
+        env:
+        - name: IMAGE
+          value: quay.io/k8scsi/snapshot-controller:v2.0.0
+        - name: OPERATOR_IMAGE_VERSION
+          value: "0.0.1-snapshot"
+        - name: OPERAND_IMAGE_VERSION
+          value: "0.0.1-snapshot_openshift"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /var/run/configmaps/config
+          name: config
+      volumes:
+      - name: config
+        configMap:
+          defaultMode: 440
+          name: openshift-csi-snapshot-controller-operator-config
+      priorityClassName: "system-cluster-critical"
+      tolerations:
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
