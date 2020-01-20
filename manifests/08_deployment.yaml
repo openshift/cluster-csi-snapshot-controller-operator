@@ -22,7 +22,7 @@ spec:
       serviceAccountName: csi-snapshot-controller-operator
       containers:
       - name: operator
-        # TODO: fix to official image
+        # TODO: fix to origin image
         image: quay.io/jsafrane/csi-snapshot-operator:latest
         imagePullPolicy: Always
         resources:
@@ -32,6 +32,7 @@ spec:
         args: [ "start", "-v", "5" , "--config=/var/run/configmaps/config/operator-config.yaml"]
         env:
         - name: IMAGE
+          # TODO: fix to origin image
           value: quay.io/k8scsi/snapshot-controller:v2.0.0
         - name: OPERATOR_IMAGE_VERSION
           value: "0.0.1-snapshot"
