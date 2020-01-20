@@ -20,6 +20,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/status"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
@@ -121,6 +122,17 @@ func (c *csiSnapshotOperator) Run(workers int, stopCh <-chan struct{}) {
 }
 
 func (c *csiSnapshotOperator) sync(key string) error {
+	instance, err := c.client.GetOperatorInstance()
+	if err != nil {
+		return err
+	}
+
+	if instance.Spec.ManagementState != operatorv1.Managed {
+		return nil // TODO do something better for all states
+	}
+
+	instanceCopy := instance.DeepCopy()
+
 	// Watch CRs for:
 	// - CSISnapshots
 	// - Deployments
@@ -136,11 +148,88 @@ func (c *csiSnapshotOperator) sync(key string) error {
 		klog.Info("Finished syncing operator at ", time.Since(startTime))
 	}()
 
-	err := c.syncCustomResourceDefinitions()
-	if err != nil {
-		return err
+	syncErr := c.handleSync(instanceCopy)
+	c.updateSyncError(&instanceCopy.Status.OperatorStatus, syncErr)
+
+	if _, _, err := v1helpers.UpdateStatus(c.client, func(status *operatorv1.OperatorStatus) error {
+		// store a copy of our starting conditions, we need to preserve last transition time
+		originalConditions := status.DeepCopy().Conditions
+
+		// copy over everything else
+		instanceCopy.Status.OperatorStatus.DeepCopyInto(status)
+
+		// restore the starting conditions
+		status.Conditions = originalConditions
+
+		// manually update the conditions while preserving last transition time
+		for _, condition := range instanceCopy.Status.Conditions {
+			v1helpers.SetOperatorCondition(&status.Conditions, condition)
+		}
+		return nil
+	}); err != nil {
+		klog.Errorf("failed to update status: %v", err)
+		if syncErr == nil {
+			syncErr = err
+		}
 	}
 
+	return syncErr
+}
+
+func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus, err error) {
+	if err != nil {
+		v1helpers.SetOperatorCondition(&status.Conditions,
+			operatorv1.OperatorCondition{
+				Type:    operatorv1.OperatorStatusTypeDegraded,
+				Status:  operatorv1.ConditionTrue,
+				Reason:  "OperatorSync",
+				Message: err.Error(),
+			})
+	} else {
+		v1helpers.SetOperatorCondition(&status.Conditions,
+			operatorv1.OperatorCondition{
+				Type:   operatorv1.OperatorStatusTypeDegraded,
+				Status: operatorv1.ConditionFalse,
+			})
+	}
+}
+
+func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotController) error {
+	if err := c.syncCustomResourceDefinitions(); err != nil {
+		return fmt.Errorf("failed to sync CRDs: %s", err)
+	}
+	if err := c.syncStatus(instance); err != nil {
+		return fmt.Errorf("failed to sync status: %s", err)
+	}
+	return nil
+}
+
+func (c *csiSnapshotOperator) syncStatus(instance *operatorv1.CSISnapshotController) error {
+	// The operator does not have any prerequisites (at least now)
+	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
+		operatorv1.OperatorCondition{
+			Type:   operatorv1.OperatorStatusTypePrereqsSatisfied,
+			Status: operatorv1.ConditionTrue,
+		})
+	// The operator is always upgradeable (at least now)
+	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
+		operatorv1.OperatorCondition{
+			Type:   operatorv1.OperatorStatusTypeUpgradeable,
+			Status: operatorv1.ConditionTrue,
+		})
+
+	// TODO: check that deployment has enough replicas
+	// TODO: check that deployment is fully updated to newest version
+	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
+		operatorv1.OperatorCondition{
+			Type:   operatorv1.OperatorStatusTypeAvailable,
+			Status: operatorv1.ConditionTrue,
+		})
+	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
+		operatorv1.OperatorCondition{
+			Type:   operatorv1.OperatorStatusTypeProgressing,
+			Status: operatorv1.ConditionFalse,
+		})
 	return nil
 }
 

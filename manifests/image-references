@@ -5,8 +5,8 @@ spec:
   - name: csi-snapshot-controller-operator
     from:
       kind: DockerImage
-      name: openshift/origin-csi-snapshot-controller-operator:latest
+      name: quay.io/jsafrane/csi-snapshot-operator:latest
   - name: csi-snapshot-controller
     from:
       kind: DockerImage
-      name: openshift/origin-csi-snapshot-controller:latest
+      name: quay.io/k8scsi/snapshot-controller:v2.0.0

@@ -8,4 +8,4 @@ FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
 COPY --from=builder /go/src/github.com/openshift/cluster-csi-snapshot-controller-operator/csi-snapshot-controller-operator /usr/bin/
 COPY manifests /manifests
 ENTRYPOINT ["/usr/bin/csi-snapshot-controller-operator"]
-LABEL io.openshift.release.operator=true
+//LABEL io.openshift.release.operator=true

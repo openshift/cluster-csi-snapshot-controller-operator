@@ -60,3 +60,11 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 
 	return &ret.Status.OperatorStatus, nil
 }
+
+func (c OperatorClient) GetOperatorInstance() (*operatorv1.CSISnapshotController, error) {
+	instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
+	if err != nil {
+		return nil, err
+	}
+	return instance, nil
+}
