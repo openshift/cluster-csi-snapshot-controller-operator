@@ -10,10 +10,12 @@ require (
 	github.com/prometheus/client_golang v1.1.0
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
+	k8s.io/api v0.17.1
 	k8s.io/apiextensions-apiserver v0.17.0
 	k8s.io/apimachinery v0.17.1
 	k8s.io/client-go v0.17.1
 	k8s.io/component-base v0.17.0
-	monis.app/go v0.0.0-20190702030534-c65526068664
+	k8s.io/klog v1.0.0
+	monis.app/go v0.0.0-20190702030534-c65526068664 // indirect
 	sigs.k8s.io/controller-runtime v0.4.0
 )
