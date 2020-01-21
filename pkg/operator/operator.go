@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
-	appsclientv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	appslisterv1 "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -70,7 +69,6 @@ type csiSnapshotOperator struct {
 
 	deployLister       appslisterv1.DeploymentLister
 	deployListerSynced cache.InformerSynced
-	deployClient       appsclientv1.AppsV1Interface
 
 	queue workqueue.RateLimitingInterface
 
@@ -82,7 +80,6 @@ func NewCSISnapshotControllerOperator(
 	crdInformer apiextinformersv1beta1.CustomResourceDefinitionInformer,
 	crdClient apiextclient.Interface,
 	deployInformer appsinformersv1.DeploymentInformer,
-	deployClient appsclientv1.AppsV1Interface,
 	kubeClient kubernetes.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
@@ -90,7 +87,6 @@ func NewCSISnapshotControllerOperator(
 	csiOperator := &csiSnapshotOperator{
 		client:        client,
 		crdClient:     crdClient,
-		deployClient:  deployClient,
 		kubeClient:    kubeClient,
 		versionGetter: versionGetter,
 		eventRecorder: eventRecorder,

@@ -77,7 +77,7 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 	deploy := c.getExpectedDeployment(instance)
 
 	deploy, _, err := resourceapply.ApplyDeployment(
-		c.deployClient,
+		c.kubeClient.AppsV1(),
 		c.eventRecorder,
 		deploy,
 		resourcemerge.ExpectedDeploymentGeneration(deploy, instance.Status.Generations),

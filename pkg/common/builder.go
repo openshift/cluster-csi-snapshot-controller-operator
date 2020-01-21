@@ -5,7 +5,6 @@ import (
 
 	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
-	appsclientv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
@@ -25,11 +24,6 @@ func (cb *Builder) APIExtClientOrDie(name string) apiext.Interface {
 // KubeClientOrDie returns the kubernetes client interface for general kubernetes objects.
 func (cb *Builder) KubeClientOrDie(name string) kubernetes.Interface {
 	return kubernetes.NewForConfigOrDie(rest.AddUserAgent(cb.config, name))
-}
-
-// AppClientOrDie returns the kubernetes client interface for application kubernetes objects
-func (cb *Builder) AppClientOrDie(name string) appsclientv1.AppsV1Interface {
-	return appsclientv1.NewForConfigOrDie(rest.AddUserAgent(cb.config, name))
 }
 
 // NewBuilder returns a *ClientBuilder with the given kubeconfig.
