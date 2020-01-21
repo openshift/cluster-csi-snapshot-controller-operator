@@ -22,3 +22,13 @@ spec:
             - "--v=5"
             - "--leader-election=true"
           imagePullPolicy: Always
+      priorityClassName: "system-cluster-critical"
+      tolerations:
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
