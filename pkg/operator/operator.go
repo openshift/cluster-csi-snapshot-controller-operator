@@ -12,7 +12,9 @@ import (
 	apiextlistersv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
+	appslisterv1 "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/workqueue"
@@ -32,24 +34,18 @@ const (
 	targetName                = "csi-snapshot-controller"
 	targetNamespace           = "openshift-csi-snapshot-controller"
 	targetNameSpaceController = "openshift-csi-controller"
-	targetNameOperator        = "openshift-csi-snapshot-controller-operator"
-	targetNameController      = "openshift-csi-snapshot-controller"
 	globalConfigName          = "cluster"
 
-	operatorSelfName       = "operator"
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
-	operandImageEnvName    = "IMAGE"
-
-	machineConfigNamespace = "openshift-config-managed"
-	userConfigNamespace    = "openshift-config"
+	operandImageEnvName    = "OPERAND_IMAGE"
 
 	maxRetries = 15
 )
 
 // static environment variables from operator deployment
 var (
-	csiSnapshotControllerImage = os.Getenv(targetNameController)
+	csiSnapshotControllerImage = os.Getenv(operandImageEnvName)
 
 	operatorVersion = os.Getenv(operatorVersionEnvName)
 	operandVersion  = os.Getenv(operandVersionEnvName)
@@ -71,6 +67,9 @@ type csiSnapshotOperator struct {
 	crdListerSyncer cache.InformerSynced
 	crdClient       apiextclient.Interface
 
+	deployLister       appslisterv1.DeploymentLister
+	deployListerSynced cache.InformerSynced
+
 	queue workqueue.RateLimitingInterface
 
 	stopCh <-chan struct{}
@@ -80,6 +79,7 @@ func NewCSISnapshotControllerOperator(
 	client OperatorClient,
 	crdInformer apiextinformersv1beta1.CustomResourceDefinitionInformer,
 	crdClient apiextclient.Interface,
+	deployInformer appsinformersv1.DeploymentInformer,
 	kubeClient kubernetes.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
@@ -96,6 +96,8 @@ func NewCSISnapshotControllerOperator(
 
 	for _, i := range []cache.SharedIndexInformer{
 		crdInformer.Informer(),
+		deployInformer.Informer(),
+		client.Informer(),
 	} {
 		i.AddEventHandler(csiOperator.eventHandler())
 	}
@@ -104,6 +106,9 @@ func NewCSISnapshotControllerOperator(
 
 	csiOperator.crdLister = crdInformer.Lister()
 	csiOperator.crdListerSyncer = crdInformer.Informer().HasSynced
+
+	csiOperator.deployLister = deployInformer.Lister()
+	csiOperator.deployListerSynced = deployInformer.Informer().HasSynced
 
 	csiOperator.vStore.Set("operator", os.Getenv("RELEASE_VERSION"))
 
@@ -199,43 +204,14 @@ func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotControl
 	if err := c.syncCustomResourceDefinitions(); err != nil {
 		return fmt.Errorf("failed to sync CRDs: %s", err)
 	}
-	if err := c.syncStatus(instance); err != nil {
+
+	deployment, err := c.syncDeployment(instance)
+	if err != nil {
+		return fmt.Errorf("failed to sync Deployments: %s", err)
+	}
+	if err := c.syncStatus(instance, deployment); err != nil {
 		return fmt.Errorf("failed to sync status: %s", err)
 	}
-	return nil
-}
-
-func (c *csiSnapshotOperator) syncStatus(instance *operatorv1.CSISnapshotController) error {
-	// The operator does not have any prerequisites (at least now)
-	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
-		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypePrereqsSatisfied,
-			Status: operatorv1.ConditionTrue,
-		})
-	// The operator is always upgradeable (at least now)
-	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
-		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypeUpgradeable,
-			Status: operatorv1.ConditionTrue,
-		})
-
-	// TODO: check that deployment has enough replicas
-	// TODO: check that deployment is fully updated to newest version
-	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
-		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypeAvailable,
-			Status: operatorv1.ConditionTrue,
-		})
-	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
-		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypeProgressing,
-			Status: operatorv1.ConditionFalse,
-		})
-
-	c.setVersion("operator", operatorVersion)
-	// TODO: check which version to report when the Deployment is being updated
-	c.setVersion("csi-snapshot-controller", operandVersion)
-
 	return nil
 }
 

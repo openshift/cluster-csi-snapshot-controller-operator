@@ -52,6 +52,7 @@ var _csi_controller_deploymentYaml = []byte(`kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: csi-snapshot-controller
+  namespace: openshift-csi-snapshot-controller
 spec:
   serviceName: "csi-snapshot-controller"
   replicas: 1

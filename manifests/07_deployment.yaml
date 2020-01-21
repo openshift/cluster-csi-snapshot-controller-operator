@@ -31,7 +31,7 @@ spec:
             cpu: 10m
         args: [ "start", "-v", "5" , "--config=/var/run/configmaps/config/operator-config.yaml"]
         env:
-        - name: IMAGE
+        - name: OPERAND_IMAGE
           # TODO: fix to origin image
           value: quay.io/k8scsi/snapshot-controller:v2.0.0
         - name: OPERATOR_IMAGE_VERSION
