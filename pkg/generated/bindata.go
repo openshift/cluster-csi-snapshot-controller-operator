@@ -71,7 +71,18 @@ spec:
           args:
             - "--v=5"
             - "--leader-election=true"
-          imagePullPolicy: Always`)
+          imagePullPolicy: Always
+      priorityClassName: "system-cluster-critical"
+      tolerations:
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+`)
 
 func csi_controller_deploymentYamlBytes() ([]byte, error) {
 	return _csi_controller_deploymentYaml, nil
