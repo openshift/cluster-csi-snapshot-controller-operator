@@ -12,7 +12,10 @@ import (
 	apiextlistersv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
+	appsclientv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	appslisterv1 "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/workqueue"
@@ -71,6 +74,10 @@ type csiSnapshotOperator struct {
 	crdListerSyncer cache.InformerSynced
 	crdClient       apiextclient.Interface
 
+	deployLister       appslisterv1.DeploymentLister
+	deployListerSynced cache.InformerSynced
+	deployClient       appsclientv1.AppsV1Interface
+
 	queue workqueue.RateLimitingInterface
 
 	stopCh <-chan struct{}
@@ -80,6 +87,8 @@ func NewCSISnapshotControllerOperator(
 	client OperatorClient,
 	crdInformer apiextinformersv1beta1.CustomResourceDefinitionInformer,
 	crdClient apiextclient.Interface,
+	deployInformer appsinformersv1.DeploymentInformer,
+	deployClient appsclientv1.AppsV1Interface,
 	kubeClient kubernetes.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
@@ -87,6 +96,7 @@ func NewCSISnapshotControllerOperator(
 	csiOperator := &csiSnapshotOperator{
 		client:        client,
 		crdClient:     crdClient,
+		deployClient:  deployClient,
 		kubeClient:    kubeClient,
 		versionGetter: versionGetter,
 		eventRecorder: eventRecorder,
@@ -104,6 +114,9 @@ func NewCSISnapshotControllerOperator(
 
 	csiOperator.crdLister = crdInformer.Lister()
 	csiOperator.crdListerSyncer = crdInformer.Informer().HasSynced
+
+	csiOperator.deployLister = deployInformer.Lister()
+	csiOperator.deployListerSynced = deployInformer.Informer().HasSynced
 
 	csiOperator.vStore.Set("operator", os.Getenv("RELEASE_VERSION"))
 
@@ -198,6 +211,9 @@ func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus,
 func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotController) error {
 	if err := c.syncCustomResourceDefinitions(); err != nil {
 		return fmt.Errorf("failed to sync CRDs: %s", err)
+	}
+	if err := c.syncDeployments(); err != nil {
+		return fmt.Errorf("failed to sync Deployments: %s", err)
 	}
 	if err := c.syncStatus(instance); err != nil {
 		return fmt.Errorf("failed to sync status: %s", err)
