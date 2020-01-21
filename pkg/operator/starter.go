@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	configv1 "github.com/openshift/api/config/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformer "github.com/openshift/client-go/config/informers/externalversions"
@@ -17,6 +15,8 @@ import (
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/status"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/klog"
 )
@@ -90,7 +90,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}{
 		csiConfigInformers,
 		configInformers,
-		ctrlctx.APIExtInformerFactory,
+		ctrlctx.APIExtInformerFactory,         // CRDs
+		ctrlctx.KubeNamespacedInformerFactory, // operand Deployment
 	} {
 		informer.Start(ctx.Done())
 	}

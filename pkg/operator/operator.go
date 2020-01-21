@@ -35,24 +35,18 @@ const (
 	targetName                = "csi-snapshot-controller"
 	targetNamespace           = "openshift-csi-snapshot-controller"
 	targetNameSpaceController = "openshift-csi-controller"
-	targetNameOperator        = "openshift-csi-snapshot-controller-operator"
-	targetNameController      = "openshift-csi-snapshot-controller"
 	globalConfigName          = "cluster"
 
-	operatorSelfName       = "operator"
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
-	operandImageEnvName    = "IMAGE"
-
-	machineConfigNamespace = "openshift-config-managed"
-	userConfigNamespace    = "openshift-config"
+	operandImageEnvName    = "OPERAND_IMAGE"
 
 	maxRetries = 15
 )
 
 // static environment variables from operator deployment
 var (
-	csiSnapshotControllerImage = os.Getenv(targetNameController)
+	csiSnapshotControllerImage = os.Getenv(operandImageEnvName)
 
 	operatorVersion = os.Getenv(operatorVersionEnvName)
 	operandVersion  = os.Getenv(operandVersionEnvName)
@@ -106,6 +100,8 @@ func NewCSISnapshotControllerOperator(
 
 	for _, i := range []cache.SharedIndexInformer{
 		crdInformer.Informer(),
+		deployInformer.Informer(),
+		client.Informer(),
 	} {
 		i.AddEventHandler(csiOperator.eventHandler())
 	}
@@ -212,46 +208,14 @@ func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotControl
 	if err := c.syncCustomResourceDefinitions(); err != nil {
 		return fmt.Errorf("failed to sync CRDs: %s", err)
 	}
-	if err := c.syncDeployments(); err != nil {
+
+	deployment, err := c.syncDeployment(instance)
+	if err != nil {
 		return fmt.Errorf("failed to sync Deployments: %s", err)
 	}
-	if err := c.syncStatus(instance); err != nil {
+	if err := c.syncStatus(instance, deployment); err != nil {
 		return fmt.Errorf("failed to sync status: %s", err)
 	}
-	return nil
-}
-
-func (c *csiSnapshotOperator) syncStatus(instance *operatorv1.CSISnapshotController) error {
-	// The operator does not have any prerequisites (at least now)
-	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
-		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypePrereqsSatisfied,
-			Status: operatorv1.ConditionTrue,
-		})
-	// The operator is always upgradeable (at least now)
-	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
-		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypeUpgradeable,
-			Status: operatorv1.ConditionTrue,
-		})
-
-	// TODO: check that deployment has enough replicas
-	// TODO: check that deployment is fully updated to newest version
-	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
-		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypeAvailable,
-			Status: operatorv1.ConditionTrue,
-		})
-	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
-		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypeProgressing,
-			Status: operatorv1.ConditionFalse,
-		})
-
-	c.setVersion("operator", operatorVersion)
-	// TODO: check which version to report when the Deployment is being updated
-	c.setVersion("csi-snapshot-controller", operandVersion)
-
 	return nil
 }
 
