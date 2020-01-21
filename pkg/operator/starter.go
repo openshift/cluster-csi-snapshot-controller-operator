@@ -59,6 +59,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		*operatorClient,
 		ctrlctx.APIExtInformerFactory.Apiextensions().V1beta1().CustomResourceDefinitions(),
 		ctrlctx.ClientBuilder.APIExtClientOrDie(targetName),
+		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
+		ctrlctx.ClientBuilder.AppClientOrDie(targetName),
 		ctrlctx.ClientBuilder.KubeClientOrDie(targetName),
 		versionGetter,
 		controllerConfig.EventRecorder,
