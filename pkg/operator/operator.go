@@ -52,6 +52,7 @@ var (
 	csiSnapshotControllerImage = os.Getenv(targetNameController)
 
 	operatorVersion = os.Getenv(operatorVersionEnvName)
+	operandVersion  = os.Getenv(operandVersionEnvName)
 
 	crdNames = []string{"volumesnapshotclasses.snapshot.storage.k8s.io", "volumesnapshotcontents.snapshot.storage.k8s.io", "volumesnapshots.snapshot.storage.k8s.io"}
 )
@@ -230,7 +231,18 @@ func (c *csiSnapshotOperator) syncStatus(instance *operatorv1.CSISnapshotControl
 			Type:   operatorv1.OperatorStatusTypeProgressing,
 			Status: operatorv1.ConditionFalse,
 		})
+
+	c.setVersion("operator", operatorVersion)
+	// TODO: check which version to report when the Deployment is being updated
+	c.setVersion("csi-snapshot-controller", operandVersion)
+
 	return nil
+}
+
+func (c *csiSnapshotOperator) setVersion(operandName, version string) {
+	if c.versionGetter.GetVersions()[operandName] != version {
+		c.versionGetter.SetVersion(operandName, version)
+	}
 }
 
 func (c *csiSnapshotOperator) enqueue(obj interface{}) {
