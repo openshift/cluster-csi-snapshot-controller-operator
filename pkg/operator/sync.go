@@ -25,9 +25,6 @@ var crds = [...]string{"volumesnapshots.yaml",
 var deployment = "csi_controller_deployment.yaml"
 
 const (
-	deploymentRolloutPollInterval = time.Second
-	deploymentRolloutTimeout      = 10 * time.Minute
-
 	customResourceReadyInterval = time.Second
 	customResourceReadyTimeout  = 10 * time.Minute
 )
