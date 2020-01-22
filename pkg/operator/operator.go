@@ -10,6 +10,7 @@ import (
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextinformersv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	apiextlistersv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
@@ -94,13 +95,9 @@ func NewCSISnapshotControllerOperator(
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
 	}
 
-	for _, i := range []cache.SharedIndexInformer{
-		crdInformer.Informer(),
-		deployInformer.Informer(),
-		client.Informer(),
-	} {
-		i.AddEventHandler(csiOperator.eventHandler())
-	}
+	crdInformer.Informer().AddEventHandler(csiOperator.eventHandler("crd"))
+	deployInformer.Informer().AddEventHandler(csiOperator.eventHandler("deployment"))
+	client.Informer().AddEventHandler(csiOperator.eventHandler("csisnapshotcontroller"))
 
 	csiOperator.syncHandler = csiOperator.sync
 
@@ -231,17 +228,31 @@ func (c *csiSnapshotOperator) enqueue(obj interface{}) {
 	c.queue.Add(workQueueKey)
 }
 
-func (c *csiSnapshotOperator) eventHandler() cache.ResourceEventHandler {
+func (c *csiSnapshotOperator) eventHandler(kind string) cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
+			logInformerEvent(kind, obj, "added")
 			c.enqueue(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
+			logInformerEvent(kind, new, "updated")
 			c.enqueue(new)
 		},
 		DeleteFunc: func(obj interface{}) {
+			logInformerEvent(kind, obj, "deleted")
 			c.enqueue(obj)
 		},
+	}
+}
+
+func logInformerEvent(kind, obj interface{}, message string) {
+	if klog.V(6) {
+		objMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return
+		}
+		// "deployment csi-snapshot-controller updated"
+		klog.V(6).Infof("Received event: %s %s %s", kind, objMeta.GetName(), message)
 	}
 }
 

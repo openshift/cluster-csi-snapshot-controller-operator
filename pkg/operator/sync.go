@@ -8,7 +8,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
@@ -87,7 +86,6 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 
 func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnapshotController) *appsv1.Deployment {
 	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
-	klog.Infof("JSAF: image=%s", csiSnapshotControllerImage)
 	deployment.Spec.Template.Spec.Containers[0].Image = csiSnapshotControllerImage
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)
