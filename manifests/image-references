@@ -2,7 +2,7 @@ kind: ImageStream
 apiVersion: image.openshift.io/v1
 spec:
   tags:
-  - name: csi-snapshot-controller-operator
+  - name: cluster-csi-snapshot-controller-operator
     from:
       kind: DockerImage
       name: quay.io/jsafrane/csi-snapshot-operator:latest
