@@ -61,7 +61,7 @@ type csiSnapshotOperator struct {
 	versionGetter status.VersionGetter
 	eventRecorder events.Recorder
 
-	syncHandler func(ic string) error
+	syncHandler func() error
 
 	crdLister       apiextlistersv1beta1.CustomResourceDefinitionLister
 	crdListerSyncer cache.InformerSynced
@@ -127,7 +127,7 @@ func (c *csiSnapshotOperator) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (c *csiSnapshotOperator) sync(key string) error {
+func (c *csiSnapshotOperator) sync() error {
 	instance, err := c.client.GetOperatorInstance()
 	if err != nil {
 		return err
@@ -227,8 +227,9 @@ func (c *csiSnapshotOperator) enqueue(obj interface{}) {
 	if cm, ok := obj.(*corev1.ConfigMap); ok && cm.GetAnnotations() != nil && cm.GetAnnotations()[resourcelock.LeaderElectionRecordAnnotationKey] != "" {
 		return
 	}
-	workQueueKey := fmt.Sprintf("%s/%s", targetNamespace, targetName)
-	c.queue.Add(workQueueKey)
+	// Sync corresponding CSISnapshotController instance. Since there is only one, sync that one.
+	// It will check all other objects (CRDs, Deployment) and update/overwrite them as needed.
+	c.queue.Add(globalConfigName)
 }
 
 func (c *csiSnapshotOperator) eventHandler() cache.ResourceEventHandler {
@@ -257,7 +258,7 @@ func (c *csiSnapshotOperator) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncHandler(key.(string))
+	err := c.syncHandler()
 	c.handleErr(err, key)
 
 	return true
