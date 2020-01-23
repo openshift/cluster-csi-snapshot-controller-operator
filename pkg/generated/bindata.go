@@ -72,6 +72,11 @@ spec:
             - "--v=5"
             - "--leader-election=true"
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              # TODO: measure on a real cluster
+              cpu: 10m
+              memory: 50Mi
       priorityClassName: "system-cluster-critical"
       tolerations:
       - key: "node.kubernetes.io/unreachable"
