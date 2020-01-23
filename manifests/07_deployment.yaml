@@ -24,7 +24,7 @@ spec:
       - name: operator
         # TODO: fix to origin image
         image: quay.io/jsafrane/csi-snapshot-operator:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
           requests:
             memory: 50Mi

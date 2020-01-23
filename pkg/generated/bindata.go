@@ -71,7 +71,7 @@ spec:
           args:
             - "--v=5"
             - "--leader-election=true"
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
       priorityClassName: "system-cluster-critical"
       tolerations:
       - key: "node.kubernetes.io/unreachable"
