@@ -6,6 +6,7 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformer "github.com/openshift/client-go/config/informers/externalversions"
 	csisnapshotconfigclient "github.com/openshift/client-go/operator/clientset/versioned"
@@ -16,6 +17,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/status"
 
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/klog"
@@ -70,6 +72,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		[]configv1.ObjectReference{
 			{Resource: "namespaces", Name: targetNamespace},
 			{Resource: "namespaces", Name: targetNameSpaceController},
+			{Group: operatorv1.GroupName, Resource: "csisnapshotcontrollers", Name: globalConfigName},
+			{Group: appsv1.GroupName, Resource: "deployments", Namespace: targetNameSpaceController, Name: targetDeploymentName},
 		},
 		configClient.ConfigV1(),
 		configInformers.Config().V1().ClusterOperators(),

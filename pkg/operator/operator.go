@@ -35,6 +35,7 @@ const (
 	targetName                = "csi-snapshot-controller"
 	targetNamespace           = "openshift-csi-snapshot-controller"
 	targetNameSpaceController = "openshift-csi-controller"
+	targetDeploymentName      = "csi-snapshot-controller"
 	globalConfigName          = "cluster"
 
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
