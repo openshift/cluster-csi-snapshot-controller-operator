@@ -119,6 +119,12 @@ func (c *csiSnapshotOperator) Run(workers int, stopCh <-chan struct{}) {
 
 	c.stopCh = stopCh
 
+	klog.Infof("Starting csi-snapshot-controller")
+
+	if !cache.WaitForNamedCacheSync("csi-snapshot-controller", stopCh, c.crdListerSyncer, c.deployListerSynced) {
+		return
+	}
+
 	for i := 0; i < workers; i++ {
 		go wait.Until(c.worker, time.Second, stopCh)
 	}
