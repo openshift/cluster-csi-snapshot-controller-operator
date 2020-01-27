@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
-	appslisterv1 "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/workqueue"
@@ -69,9 +68,6 @@ type csiSnapshotOperator struct {
 	crdListerSynced cache.InformerSynced
 	crdClient       apiextclient.Interface
 
-	deployLister       appslisterv1.DeploymentLister
-	deployListerSynced cache.InformerSynced
-
 	queue workqueue.RateLimitingInterface
 
 	stopCh <-chan struct{}
@@ -105,9 +101,6 @@ func NewCSISnapshotControllerOperator(
 	csiOperator.crdLister = crdInformer.Lister()
 	csiOperator.crdListerSynced = crdInformer.Informer().HasSynced
 
-	csiOperator.deployLister = deployInformer.Lister()
-	csiOperator.deployListerSynced = deployInformer.Informer().HasSynced
-
 	csiOperator.vStore.Set("operator", os.Getenv("RELEASE_VERSION"))
 
 	return csiOperator
@@ -119,7 +112,7 @@ func (c *csiSnapshotOperator) Run(workers int, stopCh <-chan struct{}) {
 
 	c.stopCh = stopCh
 
-	if !cache.WaitForCacheSync(stopCh, c.crdListerSynced, c.deployListerSynced, c.client.Informer().HasSynced) {
+	if !cache.WaitForCacheSync(stopCh, c.crdListerSynced, c.client.Informer().HasSynced) {
 		return
 	}
 
