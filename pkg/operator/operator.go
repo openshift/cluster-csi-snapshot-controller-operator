@@ -66,7 +66,7 @@ type csiSnapshotOperator struct {
 	syncHandler func() error
 
 	crdLister       apiextlistersv1beta1.CustomResourceDefinitionLister
-	crdListerSyncer cache.InformerSynced
+	crdListerSynced cache.InformerSynced
 	crdClient       apiextclient.Interface
 
 	deployLister       appslisterv1.DeploymentLister
@@ -103,7 +103,7 @@ func NewCSISnapshotControllerOperator(
 	csiOperator.syncHandler = csiOperator.sync
 
 	csiOperator.crdLister = crdInformer.Lister()
-	csiOperator.crdListerSyncer = crdInformer.Informer().HasSynced
+	csiOperator.crdListerSynced = crdInformer.Informer().HasSynced
 
 	csiOperator.deployLister = deployInformer.Lister()
 	csiOperator.deployListerSynced = deployInformer.Informer().HasSynced
@@ -118,6 +118,10 @@ func (c *csiSnapshotOperator) Run(workers int, stopCh <-chan struct{}) {
 	defer c.queue.ShutDown()
 
 	c.stopCh = stopCh
+
+	if !cache.WaitForCacheSync(stopCh, c.crdListerSynced, c.deployListerSynced, c.client.Informer().HasSynced) {
+		return
+	}
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(c.worker, time.Second, stopCh)
