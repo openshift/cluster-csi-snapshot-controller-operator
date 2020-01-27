@@ -32,11 +32,10 @@ var log = logf.Log.WithName("csi_snapshot_controller_operator")
 var deploymentVersionHashKey = operatorv1.GroupName + "/rvs-hash"
 
 const (
-	targetName                = "csi-snapshot-controller"
-	targetNamespace           = "openshift-csi-snapshot-controller"
-	targetNameSpaceController = "openshift-csi-controller"
-	targetDeploymentName      = "csi-snapshot-controller"
-	globalConfigName          = "cluster"
+	targetName        = "csi-snapshot-controller"
+	targetNamespace   = "openshift-csi-snapshot-controller"
+	operatorNamespace = "openshift-csi-snapshot-controller-operator"
+	globalConfigName  = "cluster"
 
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"

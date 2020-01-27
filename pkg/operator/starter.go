@@ -11,13 +11,12 @@ import (
 	configinformer "github.com/openshift/client-go/config/informers/externalversions"
 	csisnapshotconfigclient "github.com/openshift/client-go/operator/clientset/versioned"
 	informer "github.com/openshift/client-go/operator/informers/externalversions"
-	common "github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/status"
 
-	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/klog"
@@ -71,9 +70,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		targetName,
 		[]configv1.ObjectReference{
 			{Resource: "namespaces", Name: targetNamespace},
-			{Resource: "namespaces", Name: targetNameSpaceController},
+			{Resource: "namespaces", Name: operatorNamespace},
 			{Group: operatorv1.GroupName, Resource: "csisnapshotcontrollers", Name: globalConfigName},
-			{Group: appsv1.GroupName, Resource: "deployments", Namespace: targetNameSpaceController, Name: targetDeploymentName},
 		},
 		configClient.ConfigV1(),
 		configInformers.Config().V1().ClusterOperators(),
