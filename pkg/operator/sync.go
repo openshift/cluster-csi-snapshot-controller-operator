@@ -80,6 +80,16 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 		forceRollout = true
 	}
 
+	if c.versionChanged("operator", operatorVersion) {
+		// Operator version changed. The new one _may_ have updated Deployment -> we should deploy it.
+		forceRollout = true
+	}
+
+	if c.versionChanged("csi-snapshot-controller", operandVersion) {
+		// Operand version changed. Update the deployment with a new image.
+		forceRollout = true
+	}
+
 	deploy, _, err := resourceapply.ApplyDeployment(
 		c.kubeClient.AppsV1(),
 		c.eventRecorder,
