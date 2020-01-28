@@ -55,8 +55,6 @@ var (
 )
 
 type csiSnapshotOperator struct {
-	vStore *versionStore
-
 	client        OperatorClient
 	kubeClient    kubernetes.Interface
 	versionGetter status.VersionGetter
@@ -88,7 +86,6 @@ func NewCSISnapshotControllerOperator(
 		kubeClient:    kubeClient,
 		versionGetter: versionGetter,
 		eventRecorder: eventRecorder,
-		vStore:        newVersionStore(),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
 	}
 
@@ -100,8 +97,6 @@ func NewCSISnapshotControllerOperator(
 
 	csiOperator.crdLister = crdInformer.Lister()
 	csiOperator.crdListerSynced = crdInformer.Informer().HasSynced
-
-	csiOperator.vStore.Set("operator", os.Getenv("RELEASE_VERSION"))
 
 	return csiOperator
 }
