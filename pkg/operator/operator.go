@@ -216,6 +216,10 @@ func (c *csiSnapshotOperator) setVersion(operandName, version string) {
 	}
 }
 
+func (c *csiSnapshotOperator) versionChanged(operandName, version string) bool {
+	return c.versionGetter.GetVersions()[operandName] != version
+}
+
 func (c *csiSnapshotOperator) enqueue(obj interface{}) {
 	// we're filtering out config maps that are "leader" based and we don't have logic around them
 	// resyncing on these causes the operator to sync every 14s for no good reason
