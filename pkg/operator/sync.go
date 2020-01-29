@@ -23,7 +23,8 @@ var crds = [...]string{"volumesnapshots.yaml",
 
 var deployment = "csi_controller_deployment.yaml"
 
-const (
+var (
+	// Technically const, but modified by unit tests...
 	customResourceReadyInterval = time.Second
 	customResourceReadyTimeout  = 10 * time.Minute
 )
@@ -80,12 +81,12 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 		forceRollout = true
 	}
 
-	if c.versionChanged("operator", operatorVersion) {
+	if c.versionChanged("operator", c.operatorVersion) {
 		// Operator version changed. The new one _may_ have updated Deployment -> we should deploy it.
 		forceRollout = true
 	}
 
-	if c.versionChanged("csi-snapshot-controller", operandVersion) {
+	if c.versionChanged("csi-snapshot-controller", c.operandVersion) {
 		// Operand version changed. Update the deployment with a new image.
 		forceRollout = true
 	}

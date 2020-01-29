@@ -2,7 +2,6 @@ package operator
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
