@@ -104,7 +104,7 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 
 func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnapshotController) *appsv1.Deployment {
 	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
-	deployment.Spec.Template.Spec.Containers[0].Image = csiSnapshotControllerImage
+	deployment.Spec.Template.Spec.Containers[0].Image = c.csiSnapshotControllerImage
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)
 	for i, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
@@ -140,8 +140,8 @@ func (c *csiSnapshotOperator) syncStatus(instance *operatorv1.CSISnapshotControl
 		instance.Status.ReadyReplicas = deployment.Status.UpdatedReplicas
 	}
 
-	c.setVersion("operator", operatorVersion)
-	c.setVersion("csi-snapshot-controller", operandVersion)
+	c.setVersion("operator", c.operatorVersion)
+	c.setVersion("csi-snapshot-controller", c.operandVersion)
 
 	return nil
 }

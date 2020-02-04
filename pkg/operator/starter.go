@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -64,6 +65,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlctx.ClientBuilder.KubeClientOrDie(targetName),
 		versionGetter,
 		controllerConfig.EventRecorder,
+		os.Getenv(operatorVersionEnvName),
+		os.Getenv(operandVersionEnvName),
+		os.Getenv(operandImageEnvName),
 	)
 
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(

@@ -45,11 +45,6 @@ const (
 
 // static environment variables from operator deployment
 var (
-	csiSnapshotControllerImage = os.Getenv(operandImageEnvName)
-
-	operatorVersion = os.Getenv(operatorVersionEnvName)
-	operandVersion  = os.Getenv(operandVersionEnvName)
-
 	crdNames = []string{"volumesnapshotclasses.snapshot.storage.k8s.io", "volumesnapshotcontents.snapshot.storage.k8s.io", "volumesnapshots.snapshot.storage.k8s.io"}
 )
 
@@ -68,6 +63,10 @@ type csiSnapshotOperator struct {
 	queue workqueue.RateLimitingInterface
 
 	stopCh <-chan struct{}
+
+	operatorVersion            string
+	operandVersion             string
+	csiSnapshotControllerImage string
 }
 
 func NewCSISnapshotControllerOperator(
@@ -78,14 +77,20 @@ func NewCSISnapshotControllerOperator(
 	kubeClient kubernetes.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
+	operatorVersion string,
+	operandVersion string,
+	csiSnapshotControllerImage string,
 ) *csiSnapshotOperator {
 	csiOperator := &csiSnapshotOperator{
-		client:        client,
-		crdClient:     crdClient,
-		kubeClient:    kubeClient,
-		versionGetter: versionGetter,
-		eventRecorder: eventRecorder,
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
+		client:                     client,
+		crdClient:                  crdClient,
+		kubeClient:                 kubeClient,
+		versionGetter:              versionGetter,
+		eventRecorder:              eventRecorder,
+		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
+		operatorVersion:            operatorVersion,
+		operandVersion:             operandVersion,
+		csiSnapshotControllerImage: csiSnapshotControllerImage,
 	}
 
 	crdInformer.Informer().AddEventHandler(csiOperator.eventHandler("crd"))
