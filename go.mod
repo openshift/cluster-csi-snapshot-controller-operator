@@ -3,9 +3,10 @@ module github.com/openshift/cluster-csi-snapshot-controller-operator
 go 1.13
 
 require (
-	github.com/google/go-cmp v0.3.0
+	github.com/google/go-cmp v0.3.1
 	github.com/jteeuwen/go-bindata v3.0.8-0.20151023091102-a0ff2567cfb7+incompatible
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
+	github.com/kubernetes-csi/external-snapshotter/v2 v2.0.1
 	github.com/openshift/api v0.0.0-20200116145750-0e2ff1e215dd
 	github.com/openshift/client-go v0.0.0-20200116152001-92a2713fa240
 	github.com/openshift/library-go v0.0.0-20200110123007-276971bef92b
