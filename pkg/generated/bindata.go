@@ -104,23 +104,38 @@ func csi_controller_deploymentYaml() (*asset, error) {
 	return a, nil
 }
 
-var _volumesnapshotclassesYaml = []byte(`---
+var _volumesnapshotclassesYaml = []byte(`
+---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: (devel)
-    api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/139"
+    controller-gen.kubebuilder.io/version: v0.2.5
+    api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/260"
+  creationTimestamp: null
   name: volumesnapshotclasses.snapshot.storage.k8s.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .driver
+    name: Driver
+    type: string
+  - JSONPath: .deletionPolicy
+    description: Determines whether a VolumeSnapshotContent created through the VolumeSnapshotClass
+      should be deleted when its bound VolumeSnapshot is deleted.
+    name: DeletionPolicy
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: snapshot.storage.k8s.io
   names:
     kind: VolumeSnapshotClass
     listKind: VolumeSnapshotClassList
     plural: volumesnapshotclasses
     singular: volumesnapshotclass
-  scope: Cluster
   preserveUnknownFields: false
+  scope: Cluster
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: VolumeSnapshotClass specifies parameters that a underlying storage
@@ -131,7 +146,7 @@ spec:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
             of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         deletionPolicy:
           description: deletionPolicy determines whether a VolumeSnapshotContent created
@@ -151,7 +166,7 @@ spec:
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         parameters:
           additionalProperties:
@@ -173,7 +188,8 @@ status:
     kind: ""
     plural: ""
   conditions: []
-  storedVersions: []`)
+  storedVersions: []
+`)
 
 func volumesnapshotclassesYamlBytes() ([]byte, error) {
 	return _volumesnapshotclassesYaml, nil
@@ -190,25 +206,59 @@ func volumesnapshotclassesYaml() (*asset, error) {
 	return a, nil
 }
 
-var _volumesnapshotcontentsYaml = []byte(`---
+var _volumesnapshotcontentsYaml = []byte(`
+---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: (devel)
-    api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/139"
+    controller-gen.kubebuilder.io/version: v0.2.5
+    api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/260"
+  creationTimestamp: null
   name: volumesnapshotcontents.snapshot.storage.k8s.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.readyToUse
+    description: Indicates if a snapshot is ready to be used to restore a volume.
+    name: ReadyToUse
+    type: boolean
+  - JSONPath: .status.restoreSize
+    description: Represents the complete size of the snapshot in bytes
+    name: RestoreSize
+    type: integer
+  - JSONPath: .spec.deletionPolicy
+    description: Determines whether this VolumeSnapshotContent and its physical snapshot
+      on the underlying storage system should be deleted when its bound VolumeSnapshot
+      is deleted.
+    name: DeletionPolicy
+    type: string
+  - JSONPath: .spec.driver
+    description: Name of the CSI driver used to create the physical snapshot on the
+      underlying storage system.
+    name: Driver
+    type: string
+  - JSONPath: .spec.volumeSnapshotClassName
+    description: Name of the VolumeSnapshotClass to which this snapshot belongs.
+    name: VolumeSnapshotClass
+    type: string
+  - JSONPath: .spec.volumeSnapshotRef.name
+    description: Name of the VolumeSnapshot object to which this VolumeSnapshotContent
+      object is bound.
+    name: VolumeSnapshot
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: snapshot.storage.k8s.io
   names:
     kind: VolumeSnapshotContent
     listKind: VolumeSnapshotContentList
     plural: volumesnapshotcontents
     singular: volumesnapshotcontent
+  preserveUnknownFields: false
   scope: Cluster
   subresources:
     status: {}
-  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
       description: VolumeSnapshotContent represents the actual "on-disk" snapshot
@@ -217,12 +267,12 @@ spec:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
             of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         spec:
           description: spec defines properties of a VolumeSnapshotContent created
@@ -294,7 +344,7 @@ spec:
                     in the future.'
                   type: string
                 kind:
-                  description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+                  description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
                   type: string
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
@@ -304,7 +354,7 @@ spec:
                   type: string
                 resourceVersion:
                   description: 'Specific resourceVersion to which this reference is
-                    made, if any. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency'
+                    made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
                   type: string
                 uid:
                   description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
@@ -388,7 +438,8 @@ status:
     kind: ""
     plural: ""
   conditions: []
-  storedVersions: []`)
+  storedVersions: []
+`)
 
 func volumesnapshotcontentsYamlBytes() ([]byte, error) {
 	return _volumesnapshotcontentsYaml, nil
@@ -411,20 +462,57 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: (devel)
-    api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/139"
+    controller-gen.kubebuilder.io/version: v0.2.5
+    api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/260"
+  creationTimestamp: null
   name: volumesnapshots.snapshot.storage.k8s.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.readyToUse
+    description: Indicates if a snapshot is ready to be used to restore a volume.
+    name: ReadyToUse
+    type: boolean
+  - JSONPath: .spec.source.persistentVolumeClaimName
+    description: Name of the source PVC from where a dynamically taken snapshot will
+      be created.
+    name: SourcePVC
+    type: string
+  - JSONPath: .spec.source.volumeSnapshotContentName
+    description: Name of the VolumeSnapshotContent which represents a pre-provisioned
+      snapshot.
+    name: SourceSnapshotContent
+    type: string
+  - JSONPath: .status.restoreSize
+    description: Represents the complete size of the snapshot.
+    name: RestoreSize
+    type: string
+  - JSONPath: .spec.volumeSnapshotClassName
+    description: The name of the VolumeSnapshotClass requested by the VolumeSnapshot.
+    name: SnapshotClass
+    type: string
+  - JSONPath: .status.boundVolumeSnapshotContentName
+    description: The name of the VolumeSnapshotContent to which this VolumeSnapshot
+      is bound.
+    name: SnapshotContent
+    type: string
+  - JSONPath: .status.creationTime
+    description: Timestamp when the point-in-time snapshot is taken by the underlying
+      storage system.
+    name: CreationTime
+    type: date
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: snapshot.storage.k8s.io
   names:
     kind: VolumeSnapshot
     listKind: VolumeSnapshotList
     plural: volumesnapshots
     singular: volumesnapshot
+  preserveUnknownFields: false
   scope: Namespaced
   subresources:
     status: {}
-  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
       description: VolumeSnapshot is a user's request for either creating a point-in-time
@@ -433,12 +521,12 @@ spec:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
             of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         spec:
           description: 'spec defines the desired characteristics of a snapshot requested
@@ -527,6 +615,9 @@ spec:
                 of a snapshot is unknown.
               type: boolean
             restoreSize:
+              anyOf:
+              - type: integer
+              - type: string
               description: restoreSize represents the complete size of the snapshot
                 in bytes. In dynamic snapshot creation case, this field will be filled
                 in with the "size_bytes" value returned from CSI "CreateSnapshotRequest"
@@ -536,7 +627,8 @@ spec:
                 this snapshot, the size of the volume MUST NOT be smaller than the
                 restoreSize if it is specified, otherwise the restoration will fail.
                 If not specified, it indicates that the size is unknown.
-              type: string
+              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+              x-kubernetes-int-or-string: true
           type: object
       required:
       - spec
@@ -551,7 +643,8 @@ status:
     kind: ""
     plural: ""
   conditions: []
-  storedVersions: []`)
+  storedVersions: []
+`)
 
 func volumesnapshotsYamlBytes() ([]byte, error) {
 	return _volumesnapshotsYaml, nil
