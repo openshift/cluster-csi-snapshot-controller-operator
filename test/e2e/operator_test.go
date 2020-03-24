@@ -19,7 +19,7 @@ const (
 	snapshotGroup      = "snapshot.storage.k8s.io"
 	snapshotAPIVersion = "snapshot.storage.k8s.io/v1beta1"
 
-	operatorNamespace = "openshift-csi-snapshot-controller-operator"
+	operatorNamespace = "openshift-cluster-storage-operators"
 	operatorName      = "csi-snapshot-controller-operator"
 )
 

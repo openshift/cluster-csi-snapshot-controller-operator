@@ -36,7 +36,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-snapshot-controller
-    namespace: openshift-csi-snapshot-controller
+    namespace: openshift-cluster-storage-controllers
 roleRef:
   kind: ClusterRole
   name: openshift-csi-snapshot-controller-runner
@@ -46,7 +46,7 @@ roleRef:
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  namespace: openshift-csi-snapshot-controller
+  namespace: openshift-cluster-storage-controllers
   name: csi-snapshot-controller-leaderelection
 rules:
 - apiGroups: ["coordination.k8s.io"]
@@ -58,11 +58,11 @@ kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-snapshot-controller-leaderelection
-  namespace: openshift-csi-snapshot-controller
+  namespace: openshift-cluster-storage-controllers
 subjects:
   - kind: ServiceAccount
     name: csi-snapshot-controller
-    namespace: openshift-csi-snapshot-controller
+    namespace: openshift-cluster-storage-controllers
 roleRef:
   kind: Role
   name: csi-snapshot-controller-leaderelection

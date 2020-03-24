@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: openshift-csi-snapshot-controller-operator
+  namespace: openshift-cluster-storage-operators
   name: csi-snapshot-controller-operator
   labels:
     app: csi-snapshot-controller-operator
@@ -48,7 +48,7 @@ spec:
       - name: config
         configMap:
           defaultMode: 440
-          name: openshift-csi-snapshot-controller-operator-config
+          name: csi-snapshot-controller-operator-config
       priorityClassName: "system-cluster-critical"
       tolerations:
       - key: "node.kubernetes.io/unreachable"
