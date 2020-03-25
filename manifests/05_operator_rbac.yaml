@@ -2,14 +2,14 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-snapshot-controller-operator-role
-  namespace: openshift-cluster-storage-operators
+  namespace: openshift-cluster-storage-operator
   labels:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 subjects:
   - kind: ServiceAccount
     name: csi-snapshot-controller-operator
-    namespace: openshift-cluster-storage-operators
+    namespace: openshift-cluster-storage-operator
 roleRef:
   kind: ClusterRole
   name: cluster-admin

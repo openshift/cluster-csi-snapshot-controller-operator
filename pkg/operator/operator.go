@@ -31,8 +31,8 @@ var deploymentVersionHashKey = operatorv1.GroupName + "/rvs-hash"
 
 const (
 	targetName        = "csi-snapshot-controller"
-	targetNamespace   = "openshift-cluster-storage-controllers"
-	operatorNamespace = "openshift-cluster-storage-operators"
+	targetNamespace   = "openshift-cluster-storage-operator"
+	operatorNamespace = "openshift-cluster-storage-operator"
 	globalConfigName  = "cluster"
 
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
