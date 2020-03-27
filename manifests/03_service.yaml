@@ -6,8 +6,8 @@ metadata:
     service.alpha.openshift.io/serving-cert-secret-name: serving-cert
   labels:
     app: csi-snapshot-controller-operator
-  name: metrics
-  namespace: openshift-csi-snapshot-controller-operator
+  name: csi-snapshot-controller-operator-metrics
+  namespace: openshift-cluster-storage-operator
 spec:
   ports:
   - name: https
