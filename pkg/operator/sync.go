@@ -73,30 +73,11 @@ func (c *csiSnapshotOperator) waitForCustomResourceDefinition(resource *apiextv1
 func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotController) (*appsv1.Deployment, error) {
 	deploy := c.getExpectedDeployment(instance)
 
-	// Update the deployment when something updated CSISnapshotController.Spec.LogLevel.
-	// The easiest check is for Generation update (i.e. redeploy on any CSISnapshotController.Spec change).
-	// This may update the Deployment more than it is strictly necessary, but the overhead is not that big.
-	forceRollout := false
-	if instance.Generation != instance.Status.ObservedGeneration {
-		forceRollout = true
-	}
-
-	if c.versionChanged("operator", c.operatorVersion) {
-		// Operator version changed. The new one _may_ have updated Deployment -> we should deploy it.
-		forceRollout = true
-	}
-
-	if c.versionChanged("csi-snapshot-controller", c.operandVersion) {
-		// Operand version changed. Update the deployment with a new image.
-		forceRollout = true
-	}
-
 	deploy, _, err := resourceapply.ApplyDeployment(
 		c.kubeClient.AppsV1(),
 		c.eventRecorder,
 		deploy,
-		resourcemerge.ExpectedDeploymentGeneration(deploy, instance.Status.Generations),
-		forceRollout)
+		resourcemerge.ExpectedDeploymentGeneration(deploy, instance.Status.Generations))
 	if err != nil {
 		return nil, err
 	}
