@@ -32,7 +32,7 @@ var (
 func (c *csiSnapshotOperator) syncCustomResourceDefinitions() error {
 	for _, file := range crds {
 		crd := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(generated.MustAsset(file))
-		_, updated, err := resourceapply.ApplyCustomResourceDefinition(c.crdClient.ApiextensionsV1beta1(), c.eventRecorder, crd)
+		_, updated, err := resourceapply.ApplyCustomResourceDefinitionV1Beta1(c.crdClient.ApiextensionsV1beta1(), c.eventRecorder, crd)
 		if err != nil {
 			return err
 		}
