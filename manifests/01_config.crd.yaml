@@ -38,6 +38,12 @@ spec:
           type: string
         metadata:
           type: object
+          properties:
+            name:
+              type: string
+              # Force "cluster" as CR name.
+              enum:
+               - cluster
         spec:
           description:
             CSISnapshotControllerSpec is the specification of the desired behavior of
@@ -51,6 +57,11 @@ spec:
                 coarse grained logging choices that operators have to interpret for
                 their operands.
               type: string
+              enum:
+               - Normal
+               - Debug
+               - Trace
+               - TraceAll
             managementState:
               description:
                 managementState indicates whether and how the operator
@@ -72,6 +83,11 @@ spec:
                 way to manage coarse grained logging choices that operators have to
                 interpret for themselves.
               type: string
+              enum:
+               - Normal
+               - Debug
+               - Trace
+               - TraceAll
             unsupportedConfigOverrides:
               description:
                 "unsupportedConfigOverrides holds a sparse config that
