@@ -7,6 +7,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -29,7 +30,18 @@ var (
 	customResourceReadyTimeout  = 10 * time.Minute
 )
 
+type AlphaCRDError struct {
+	alphaCRDs []string
+}
+
+func (a *AlphaCRDError) Error() string {
+	return fmt.Sprintf("cluster-csi-snapshot-controller-operator does not support v1alpha1 version of snapshot CRDs %s installed by user or 3rd party controller", strings.Join(a.alphaCRDs, ", "))
+}
+
 func (c *csiSnapshotOperator) syncCustomResourceDefinitions() error {
+	if err := c.checkAlphaCRDs(); err != nil {
+		return err
+	}
 	for _, file := range crds {
 		crd := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(generated.MustAsset(file))
 		_, updated, err := resourceapply.ApplyCustomResourceDefinition(c.crdClient.ApiextensionsV1beta1(), c.eventRecorder, crd)
@@ -66,6 +78,31 @@ func (c *csiSnapshotOperator) waitForCustomResourceDefinition(resource *apiextv1
 			return fmt.Errorf("%v during syncCustomResourceDefinitions: %v", err, lastErr)
 		}
 		return err
+	}
+	return nil
+}
+
+// checkCRDAlpha checks if v1alpha1 version of the CRD exists and returns human-friendly error if so.
+// This happens during update from 4.3 cluster that may use v1alpha1 CRD version installed by cluster admin.
+func (c *csiSnapshotOperator) checkAlphaCRDs() error {
+	var alphas []string
+	for _, file := range crds {
+		crd := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(generated.MustAsset(file))
+		oldCRD, err := c.crdLister.Get(crd.Name)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return fmt.Errorf("error getting CustomResourceDefinition %s: %v", crd.Name, err)
+		}
+		for _, version := range oldCRD.Spec.Versions {
+			if version.Name == "v1alpha1" {
+				alphas = append(alphas, oldCRD.Name)
+			}
+		}
+	}
+	if len(alphas) != 0 {
+		return &AlphaCRDError{alphas}
 	}
 	return nil
 }

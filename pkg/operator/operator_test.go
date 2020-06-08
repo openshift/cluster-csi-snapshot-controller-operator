@@ -87,7 +87,7 @@ func newOperator(test operatorTest) *testContext {
 	extAPIInformerFactory := apiextinformers.NewSharedInformerFactory(extAPIClient, 0)
 	// Fill the informer
 	for i := range test.initialObjects.crds {
-		extAPIInformerFactory.Apiextensions().V1().CustomResourceDefinitions().Informer().GetIndexer().Add(test.initialObjects.crds[i])
+		extAPIInformerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer().GetIndexer().Add(test.initialObjects.crds[i])
 	}
 	if test.reactors.crds != nil {
 		test.reactors.crds(extAPIClient, extAPIInformerFactory)
@@ -317,6 +317,86 @@ func withEstablishedConditions(instance *apiextv1beta1.CustomResourceDefinition)
 	return instance
 }
 
+func getAlphaCRD(crdName string) *apiextv1beta1.CustomResourceDefinition {
+	var crdFile string
+	switch crdName {
+	case "VolumeSnapshot":
+		crdFile = `
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+    name: volumesnapshots.snapshot.storage.k8s.io
+spec:
+    conversion:
+      strategy: None
+    group: snapshot.storage.k8s.io
+    names:
+      kind: VolumeSnapshot
+      listKind: VolumeSnapshotList
+      plural: volumesnapshots
+      singular: volumesnapshot
+    preserveUnknownFields: true
+    scope: Namespaced
+    versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+    subresources:
+      status: {}
+`
+
+	case "VolumeSnapshotContent":
+		crdFile = `
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+    name: volumesnapshotcontents.snapshot.storage.k8s.io
+spec:
+    conversion:
+      strategy: None
+    group: snapshot.storage.k8s.io
+    names:
+      kind: VolumeSnapshotContent
+      listKind: VolumeSnapshotContentList
+      plural: volumesnapshotcontents
+      singular: volumesnapshotcontent
+    preserveUnknownFields: true
+    scope: Cluster
+    versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+`
+	case "VolumeSnapshotClass":
+		crdFile = `
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+    name: volumesnapshotclasses.snapshot.storage.k8s.io
+spec:
+    conversion:
+      strategy: None
+    group: snapshot.storage.k8s.io
+    names:
+      kind: VolumeSnapshotClass
+      listKind: VolumeSnapshotClassList
+      plural: volumesnapshotclasses
+      singular: volumesnapshotclass
+    preserveUnknownFields: true
+    scope: Cluster
+    versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+    subresources:
+      status:
+`
+	default:
+		panic(crdName)
+	}
+	return resourceread.ReadCustomResourceDefinitionV1Beta1OrDie([]byte(crdFile))
+}
+
 // Optional reactor that sets Established condition to True. It's needed by the operator that polls for CRDs until they get the condition
 func addCRDEstablishedRector(client *fakeextapi.Clientset, informer apiextinformers.SharedInformerFactory) {
 	client.PrependReactor("*", "customresourcedefinitions", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -536,6 +616,58 @@ func TestSync(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			// error: v1alpha1 VolumeSnapshot already exists
+			name:  "v1alpha1 VolumeSnapshot",
+			image: defaultImage,
+			initialObjects: testObjects{
+				csiSnapshotController: csiSnapshotController(),
+				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshot")},
+			},
+			expectedObjects: testObjects{
+				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshot")},
+				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
+			},
+			expectErr: true,
+			reactors: testReactors{
+				crds: addCRDEstablishedRector,
+			},
+		},
+		{
+			// error: v1alpha1 VolumeSnapshotContent already exists
+			name:  "v1alpha1 VolumeSnapshotContent",
+			image: defaultImage,
+			initialObjects: testObjects{
+				csiSnapshotController: csiSnapshotController(),
+				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotContent")},
+			},
+			expectedObjects: testObjects{
+				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotContent")},
+				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
+			},
+			expectErr: true,
+			reactors: testReactors{
+				crds: addCRDEstablishedRector,
+			},
+		},
+		{
+			// error: v1alpha1 VolumeSnapshotClass already exists
+			name:  "v1alpha1 VolumeSnapshotClass",
+			image: defaultImage,
+			initialObjects: testObjects{
+				csiSnapshotController: csiSnapshotController(),
+				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotClass")},
+			},
+			expectedObjects: testObjects{
+				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotClass")},
+				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
+			},
+			expectErr: true,
+			reactors: testReactors{
+				crds: addCRDEstablishedRector,
+			},
+		},
+
 		// TODO: more error cases? Deployment creation fails and things like that?
 	}
 
