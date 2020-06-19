@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -177,11 +178,16 @@ func (c *csiSnapshotOperator) sync() error {
 
 func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus, err error) {
 	if err != nil {
+		degradedReason := "OperatorSync"
+		var errAlpha *AlphaCRDError
+		if errors.As(err, &errAlpha) {
+			degradedReason = "AlphaCRDsExist"
+		}
 		v1helpers.SetOperatorCondition(&status.Conditions,
 			operatorv1.OperatorCondition{
 				Type:    operatorv1.OperatorStatusTypeDegraded,
 				Status:  operatorv1.ConditionTrue,
-				Reason:  "OperatorSync",
+				Reason:  degradedReason,
 				Message: err.Error(),
 			})
 	} else {
@@ -195,7 +201,8 @@ func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus,
 
 func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotController) error {
 	if err := c.syncCustomResourceDefinitions(); err != nil {
-		return fmt.Errorf("failed to sync CRDs: %s", err)
+		// Pass through AlphaCRDError via %w
+		return fmt.Errorf("failed to sync CRDs: %w", err)
 	}
 
 	deployment, err := c.syncDeployment(instance)
