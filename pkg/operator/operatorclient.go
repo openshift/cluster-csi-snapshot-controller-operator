@@ -1,7 +1,11 @@
 package operator
 
 import (
+	"context"
+
 	"k8s.io/client-go/tools/cache"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
@@ -27,6 +31,14 @@ func (c OperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv
 	return &instance.Spec.OperatorSpec, &instance.Status.OperatorStatus, instance.ResourceVersion, nil
 }
 
+func (c OperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
+	instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
+	if err != nil {
+		return nil, err
+	}
+	return &instance.ObjectMeta, nil
+}
+
 func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
 	original, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
 	if err != nil {
@@ -36,7 +48,7 @@ func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operato
 	copy.ResourceVersion = resourceVersion
 	copy.Spec.OperatorSpec = *spec
 
-	ret, err := c.Client.CSISnapshotControllers().Update(copy)
+	ret, err := c.Client.CSISnapshotControllers().Update(context.TODO(), copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -53,7 +65,7 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 	copy.ResourceVersion = resourceVersion
 	copy.Status.OperatorStatus = *status
 
-	ret, err := c.Client.CSISnapshotControllers().UpdateStatus(copy)
+	ret, err := c.Client.CSISnapshotControllers().UpdateStatus(context.TODO(), copy, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
