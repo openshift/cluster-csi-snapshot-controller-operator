@@ -5,6 +5,7 @@
 package dependencymagnet
 
 import (
-	_ "github.com/jteeuwen/go-bindata/go-bindata"
-	_ "github.com/openshift/library-go/alpha-build-machinery"
+	_ "github.com/go-bindata/go-bindata"
+	_ "github.com/go-bindata/go-bindata/go-bindata"
+	_ "github.com/openshift/build-machinery-go"
 )
