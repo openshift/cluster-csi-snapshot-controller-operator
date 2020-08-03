@@ -17,6 +17,7 @@ require (
 	go.etcd.io/bbolt v1.3.5 // indirect
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200520232829-54ba9589114f // indirect
 	go.uber.org/zap v1.14.1 // indirect
+	golang.org/x/text v0.3.3 // indirect
 	k8s.io/api v0.18.3
 	k8s.io/apiextensions-apiserver v0.18.3
 	k8s.io/apimachinery v0.18.3
