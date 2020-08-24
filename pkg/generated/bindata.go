@@ -96,6 +96,9 @@ spec:
         operator: "Exists"
         effect: "NoExecute"
         tolerationSeconds: 120
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: "NoSchedule"
 `)
 
 func csi_controller_deploymentYamlBytes() ([]byte, error) {
