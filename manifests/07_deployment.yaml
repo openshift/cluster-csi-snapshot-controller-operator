@@ -50,6 +50,8 @@ spec:
           defaultMode: 440
           name: csi-snapshot-controller-operator-config
       priorityClassName: "system-cluster-critical"
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
       tolerations:
       - key: "node.kubernetes.io/unreachable"
         operator: "Exists"
