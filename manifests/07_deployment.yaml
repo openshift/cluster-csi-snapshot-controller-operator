@@ -21,7 +21,7 @@ spec:
     spec:
       serviceAccountName: csi-snapshot-controller-operator
       containers:
-      - name: operator
+      - name: csi-snapshot-controller-operator
         image: quay.io/openshift/origin-cluster-csi-snapshot-controller-operator:latest
         imagePullPolicy: IfNotPresent
         resources:
