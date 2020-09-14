@@ -6,7 +6,7 @@ metadata:
   labels:
     app: csi-snapshot-controller-operator
   annotations:
-    config.openshift.io/inject-proxy: operator
+    config.openshift.io/inject-proxy: csi-snapshot-controller-operator
     exclude.release.openshift.io/internal-openshift-hosted: "true"
 spec:
   replicas: 1
