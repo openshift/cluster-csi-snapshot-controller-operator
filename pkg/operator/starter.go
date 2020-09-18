@@ -20,7 +20,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -59,7 +59,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	operator := NewCSISnapshotControllerOperator(
 		*operatorClient,
-		ctrlctx.APIExtInformerFactory.Apiextensions().V1beta1().CustomResourceDefinitions(),
+		ctrlctx.APIExtInformerFactory.Apiextensions().V1().CustomResourceDefinitions(),
 		ctrlctx.ClientBuilder.APIExtClientOrDie(targetName),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		ctrlctx.ClientBuilder.KubeClientOrDie(targetName),
