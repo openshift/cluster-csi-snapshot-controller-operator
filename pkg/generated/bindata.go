@@ -78,6 +78,8 @@ spec:
               cpu: 10m
               memory: 50Mi
       priorityClassName: "system-cluster-critical"
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
       tolerations:
       - key: "node.kubernetes.io/unreachable"
         operator: "Exists"
@@ -87,6 +89,9 @@ spec:
         operator: "Exists"
         effect: "NoExecute"
         tolerationSeconds: 120
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: "NoSchedule"
 `)
 
 func csi_controller_deploymentYamlBytes() ([]byte, error) {
