@@ -196,7 +196,7 @@ func (c *csiSnapshotOperator) syncAvailableCondition(deployment *appsv1.Deployme
 				Type:    operatorv1.OperatorStatusTypeAvailable,
 				Status:  operatorv1.ConditionFalse,
 				Message: "Waiting for Deployment to deploy csi-snapshot-controller pods",
-				Reason:  "AsExpected",
+				Reason:  "Deploying",
 			})
 	}
 }
@@ -207,6 +207,7 @@ func (c *csiSnapshotOperator) syncProgressingCondition(instance *operatorv1.CSIS
 	var progressing operatorv1.ConditionStatus
 	var progressingMessage string
 	var expectedReplicas int32
+	var reason string
 	if deployment != nil && deployment.Spec.Replicas != nil {
 		expectedReplicas = *deployment.Spec.Replicas
 	}
@@ -215,31 +216,37 @@ func (c *csiSnapshotOperator) syncProgressingCondition(instance *operatorv1.CSIS
 		// Not reachable in theory, but better to be on the safe side...
 		progressing = operatorv1.ConditionTrue
 		progressingMessage = "Waiting for Deployment to be created"
+		reason = "Deploying"
 
 	case deployment.Generation != deployment.Status.ObservedGeneration:
 		progressing = operatorv1.ConditionTrue
 		progressingMessage = "Waiting for Deployment to act on changes"
+		reason = "Deploying"
 
 	case deployment.Status.UnavailableReplicas > 0:
 		progressing = operatorv1.ConditionTrue
 		progressingMessage = "Waiting for Deployment to deploy csi-snapshot-controller pods"
+		reason = "Deploying"
 
 	case deployment.Status.UpdatedReplicas < expectedReplicas:
 		progressing = operatorv1.ConditionTrue
 		progressingMessage = "Waiting for Deployment to update csi-snapshot-controller pods"
+		reason = "Deploying"
 
 	case deployment.Status.AvailableReplicas < expectedReplicas:
 		progressing = operatorv1.ConditionTrue
 		progressingMessage = "Waiting for Deployment to deploy csi-snapshot-controller pods"
+		reason = "Deploying"
 
 	default:
 		progressing = operatorv1.ConditionFalse
+		reason = "AsExpected"
 	}
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{
 			Type:    operatorv1.OperatorStatusTypeProgressing,
 			Status:  progressing,
 			Message: progressingMessage,
-			Reason:  "AsExpected",
+			Reason:  reason,
 		})
 }
