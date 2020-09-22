@@ -8,8 +8,8 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextinformersv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
-	apiextlistersv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
+	apiextinformersv1 "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	apiextlistersv1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -18,7 +18,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/status"
@@ -56,7 +56,7 @@ type csiSnapshotOperator struct {
 
 	syncHandler func() error
 
-	crdLister       apiextlistersv1beta1.CustomResourceDefinitionLister
+	crdLister       apiextlistersv1.CustomResourceDefinitionLister
 	crdListerSynced cache.InformerSynced
 	crdClient       apiextclient.Interface
 
@@ -71,7 +71,7 @@ type csiSnapshotOperator struct {
 
 func NewCSISnapshotControllerOperator(
 	client OperatorClient,
-	crdInformer apiextinformersv1beta1.CustomResourceDefinitionInformer,
+	crdInformer apiextinformersv1.CustomResourceDefinitionInformer,
 	crdClient apiextclient.Interface,
 	deployInformer appsinformersv1.DeploymentInformer,
 	kubeClient kubernetes.Interface,
@@ -254,7 +254,7 @@ func (c *csiSnapshotOperator) eventHandler(kind string) cache.ResourceEventHandl
 }
 
 func logInformerEvent(kind, obj interface{}, message string) {
-	if klog.V(6) {
+	if klog.V(6).Enabled() {
 		objMeta, err := meta.Accessor(obj)
 		if err != nil {
 			return

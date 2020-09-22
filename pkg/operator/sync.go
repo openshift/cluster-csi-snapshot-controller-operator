@@ -6,7 +6,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -43,8 +43,8 @@ func (c *csiSnapshotOperator) syncCustomResourceDefinitions() error {
 		return err
 	}
 	for _, file := range crds {
-		crd := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(generated.MustAsset(file))
-		_, updated, err := resourceapply.ApplyCustomResourceDefinitionV1Beta1(c.crdClient.ApiextensionsV1beta1(), c.eventRecorder, crd)
+		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(generated.MustAsset(file))
+		_, updated, err := resourceapply.ApplyCustomResourceDefinitionV1(c.crdClient.ApiextensionsV1(), c.eventRecorder, crd)
 		if err != nil {
 			return err
 		}
@@ -57,7 +57,7 @@ func (c *csiSnapshotOperator) syncCustomResourceDefinitions() error {
 	return nil
 }
 
-func (c *csiSnapshotOperator) waitForCustomResourceDefinition(resource *apiextv1beta1.CustomResourceDefinition) error {
+func (c *csiSnapshotOperator) waitForCustomResourceDefinition(resource *apiextv1.CustomResourceDefinition) error {
 	var lastErr error
 	if err := wait.Poll(customResourceReadyInterval, customResourceReadyTimeout, func() (bool, error) {
 		crd, err := c.crdLister.Get(resource.Name)
@@ -67,7 +67,7 @@ func (c *csiSnapshotOperator) waitForCustomResourceDefinition(resource *apiextv1
 		}
 
 		for _, condition := range crd.Status.Conditions {
-			if condition.Type == apiextv1beta1.Established && condition.Status == apiextv1beta1.ConditionTrue {
+			if condition.Type == apiextv1.Established && condition.Status == apiextv1.ConditionTrue {
 				return true, nil
 			}
 		}
@@ -87,7 +87,7 @@ func (c *csiSnapshotOperator) waitForCustomResourceDefinition(resource *apiextv1
 func (c *csiSnapshotOperator) checkAlphaCRDs() error {
 	var alphas []string
 	for _, file := range crds {
-		crd := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(generated.MustAsset(file))
+		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(generated.MustAsset(file))
 		oldCRD, err := c.crdLister.Get(crd.Name)
 		if err != nil {
 			if errors.IsNotFound(err) {

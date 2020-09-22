@@ -16,7 +16,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/status"
 	appsv1 "k8s.io/api/apps/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	fakeextapi "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	apiextinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -48,7 +48,7 @@ type testContext struct {
 
 type testObjects struct {
 	deployment            *appsv1.Deployment
-	crds                  []*apiextv1beta1.CustomResourceDefinition
+	crds                  []*apiextv1.CustomResourceDefinition
 	csiSnapshotController *opv1.CSISnapshotController
 }
 
@@ -89,7 +89,7 @@ func newOperator(test operatorTest) *testContext {
 	extAPIInformerFactory := apiextinformers.NewSharedInformerFactory(extAPIClient, 0)
 	// Fill the informer
 	for i := range test.initialObjects.crds {
-		extAPIInformerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer().GetIndexer().Add(test.initialObjects.crds[i])
+		extAPIInformerFactory.Apiextensions().V1().CustomResourceDefinitions().Informer().GetIndexer().Add(test.initialObjects.crds[i])
 	}
 	if test.reactors.crds != nil {
 		test.reactors.crds(extAPIClient, extAPIInformerFactory)
@@ -124,7 +124,7 @@ func newOperator(test operatorTest) *testContext {
 
 	recorder := events.NewInMemoryRecorder("operator")
 	op := NewCSISnapshotControllerOperator(client,
-		extAPIInformerFactory.Apiextensions().V1beta1().CustomResourceDefinitions(),
+		extAPIInformerFactory.Apiextensions().V1().CustomResourceDefinitions(),
 		extAPIClient,
 		coreInformerFactory.Apps().V1().Deployments(),
 		coreClient,
@@ -295,12 +295,12 @@ func withDeploymentGeneration(generations ...int64) deploymentModifier {
 
 // CRDs
 
-type crdModifier func(*apiextv1beta1.CustomResourceDefinition) *apiextv1beta1.CustomResourceDefinition
+type crdModifier func(*apiextv1.CustomResourceDefinition) *apiextv1.CustomResourceDefinition
 
-func getCRDs(modifiers ...crdModifier) []*apiextv1beta1.CustomResourceDefinition {
-	crdObjects := make([]*apiextv1beta1.CustomResourceDefinition, 3)
+func getCRDs(modifiers ...crdModifier) []*apiextv1.CustomResourceDefinition {
+	crdObjects := make([]*apiextv1.CustomResourceDefinition, 3)
 	for i, file := range crds {
-		crd := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(generated.MustAsset(file))
+		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(generated.MustAsset(file))
 		for _, modifier := range modifiers {
 			crd = modifier(crd)
 		}
@@ -309,22 +309,22 @@ func getCRDs(modifiers ...crdModifier) []*apiextv1beta1.CustomResourceDefinition
 	return crdObjects
 }
 
-func withEstablishedConditions(instance *apiextv1beta1.CustomResourceDefinition) *apiextv1beta1.CustomResourceDefinition {
-	instance.Status.Conditions = []apiextv1beta1.CustomResourceDefinitionCondition{
+func withEstablishedConditions(instance *apiextv1.CustomResourceDefinition) *apiextv1.CustomResourceDefinition {
+	instance.Status.Conditions = []apiextv1.CustomResourceDefinitionCondition{
 		{
-			Type:   apiextv1beta1.Established,
-			Status: apiextv1beta1.ConditionTrue,
+			Type:   apiextv1.Established,
+			Status: apiextv1.ConditionTrue,
 		},
 	}
 	return instance
 }
 
-func getAlphaCRD(crdName string) *apiextv1beta1.CustomResourceDefinition {
+func getAlphaCRD(crdName string) *apiextv1.CustomResourceDefinition {
 	var crdFile string
 	switch crdName {
 	case "VolumeSnapshot":
 		crdFile = `
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
     name: volumesnapshots.snapshot.storage.k8s.io
@@ -349,7 +349,7 @@ spec:
 
 	case "VolumeSnapshotContent":
 		crdFile = `
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
     name: volumesnapshotcontents.snapshot.storage.k8s.io
@@ -371,7 +371,7 @@ spec:
 `
 	case "VolumeSnapshotClass":
 		crdFile = `
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
     name: volumesnapshotclasses.snapshot.storage.k8s.io
@@ -396,7 +396,7 @@ spec:
 	default:
 		panic(crdName)
 	}
-	return resourceread.ReadCustomResourceDefinitionV1Beta1OrDie([]byte(crdFile))
+	return resourceread.ReadCustomResourceDefinitionV1OrDie([]byte(crdFile))
 }
 
 // Optional reactor that sets Established condition to True. It's needed by the operator that polls for CRDs until they get the condition
@@ -405,17 +405,17 @@ func addCRDEstablishedRector(client *fakeextapi.Clientset, informer apiextinform
 		switch a := action.(type) {
 		case core.CreateActionImpl:
 			object := a.GetObject()
-			crd := object.(*apiextv1beta1.CustomResourceDefinition)
+			crd := object.(*apiextv1.CustomResourceDefinition)
 			crd = crd.DeepCopy()
 			crd = withEstablishedConditions(crd)
-			informer.Apiextensions().V1beta1().CustomResourceDefinitions().Informer().GetIndexer().Add(crd)
+			informer.Apiextensions().V1().CustomResourceDefinitions().Informer().GetIndexer().Add(crd)
 			return false, crd, nil
 		case core.UpdateActionImpl:
 			object := a.GetObject()
-			crd := object.(*apiextv1beta1.CustomResourceDefinition)
+			crd := object.(*apiextv1.CustomResourceDefinition)
 			crd = crd.DeepCopy()
 			crd = withEstablishedConditions(crd)
-			informer.Apiextensions().V1beta1().CustomResourceDefinitions().Informer().GetIndexer().Update(crd)
+			informer.Apiextensions().V1().CustomResourceDefinitions().Informer().GetIndexer().Update(crd)
 			return false, crd, nil
 		}
 		return false, nil, nil
@@ -613,7 +613,7 @@ func TestSync(t *testing.T) {
 				csiSnapshotController: csiSnapshotController(),
 			},
 			expectedObjects: testObjects{
-				crds:                  []*apiextv1beta1.CustomResourceDefinition{getCRDs()[0]}, // Only the first CRD is created
+				crds:                  []*apiextv1.CustomResourceDefinition{getCRDs()[0]}, // Only the first CRD is created
 				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
 			},
 			expectErr: true,
@@ -624,10 +624,10 @@ func TestSync(t *testing.T) {
 			image: defaultImage,
 			initialObjects: testObjects{
 				csiSnapshotController: csiSnapshotController(),
-				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshot")},
+				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshot")},
 			},
 			expectedObjects: testObjects{
-				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshot")},
+				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshot")},
 				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
 			},
 			expectErr: true,
@@ -641,10 +641,10 @@ func TestSync(t *testing.T) {
 			image: defaultImage,
 			initialObjects: testObjects{
 				csiSnapshotController: csiSnapshotController(),
-				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotContent")},
+				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotContent")},
 			},
 			expectedObjects: testObjects{
-				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotContent")},
+				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotContent")},
 				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
 			},
 			expectErr: true,
@@ -658,10 +658,10 @@ func TestSync(t *testing.T) {
 			image: defaultImage,
 			initialObjects: testObjects{
 				csiSnapshotController: csiSnapshotController(),
-				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotClass")},
+				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotClass")},
 			},
 			expectedObjects: testObjects{
-				crds:                  []*apiextv1beta1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotClass")},
+				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotClass")},
 				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
 			},
 			expectErr: true,
@@ -691,13 +691,13 @@ func TestSync(t *testing.T) {
 			}
 
 			// Check expectedObjects.crds
-			actualCRDList, _ := ctx.extAPIClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(context.TODO(), metav1.ListOptions{})
-			actualCRDs := map[string]*apiextv1beta1.CustomResourceDefinition{}
+			actualCRDList, _ := ctx.extAPIClient.ApiextensionsV1().CustomResourceDefinitions().List(context.TODO(), metav1.ListOptions{})
+			actualCRDs := map[string]*apiextv1.CustomResourceDefinition{}
 			for i := range actualCRDList.Items {
 				crd := &actualCRDList.Items[i]
 				actualCRDs[crd.Name] = crd
 			}
-			expectedCRDs := map[string]*apiextv1beta1.CustomResourceDefinition{}
+			expectedCRDs := map[string]*apiextv1.CustomResourceDefinition{}
 			for _, crd := range test.expectedObjects.crds {
 				expectedCRDs[crd.Name] = crd
 			}

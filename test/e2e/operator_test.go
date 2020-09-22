@@ -13,7 +13,7 @@ import (
 	framework "github.com/openshift/cluster-csi-snapshot-controller-operator/test/framework"
 	kapierrs "k8s.io/apimachinery/pkg/api/errors"
 
-	volumesnapshotsv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
+	volumesnapshotsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 )
 
 const (
@@ -56,7 +56,7 @@ func TestCSISnapshotControllerOperator(t *testing.T) {
 	}
 
 	// Ensure the VolumeSnapshot CRD is installed
-	_, err = client.ApiextensionsV1beta1Interface.CustomResourceDefinitions().Get(context.TODO(), "volumesnapshots.snapshot.storage.k8s.io", metav1.GetOptions{})
+	_, err = client.ApiextensionsV1Interface.CustomResourceDefinitions().Get(context.TODO(), "volumesnapshots.snapshot.storage.k8s.io", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Error attempting to retrieve snapshot CRD: %v", err)
 	}
