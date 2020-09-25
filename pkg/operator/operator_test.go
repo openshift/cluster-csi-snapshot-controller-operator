@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"context"
 	"sort"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	opinformers "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/status"
 	appsv1 "k8s.io/api/apps/v1"
@@ -256,7 +258,7 @@ func getDeployment(args []string, image string, modifiers ...deploymentModifier)
 	if dep.Annotations == nil {
 		dep.Annotations = map[string]string{}
 	}
-	dep.Annotations["operator.openshift.io/pull-spec"] = image
+	resourceapply.SetSpecHashAnnotation(&dep.ObjectMeta, dep.Spec)
 
 	for _, modifier := range modifiers {
 		dep = modifier(dep)
@@ -689,7 +691,7 @@ func TestSync(t *testing.T) {
 			}
 
 			// Check expectedObjects.crds
-			actualCRDList, _ := ctx.extAPIClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
+			actualCRDList, _ := ctx.extAPIClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(context.TODO(), metav1.ListOptions{})
 			actualCRDs := map[string]*apiextv1beta1.CustomResourceDefinition{}
 			for i := range actualCRDList.Items {
 				crd := &actualCRDList.Items[i]
@@ -719,7 +721,7 @@ func TestSync(t *testing.T) {
 
 			// Check expectedObjects.deployment
 			if test.expectedObjects.deployment != nil {
-				actualDeployment, err := ctx.coreClient.AppsV1().Deployments(targetNamespace).Get(targetName, metav1.GetOptions{})
+				actualDeployment, err := ctx.coreClient.AppsV1().Deployments(targetNamespace).Get(context.TODO(), targetName, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Failed to get Deployment %s: %v", targetName, err)
 				}
@@ -731,7 +733,7 @@ func TestSync(t *testing.T) {
 			}
 			// Check expectedObjects.csiSnapshotController
 			if test.expectedObjects.csiSnapshotController != nil {
-				actualCSISnapshotController, err := ctx.operatorClient.OperatorV1().CSISnapshotControllers().Get(globalConfigName, metav1.GetOptions{})
+				actualCSISnapshotController, err := ctx.operatorClient.OperatorV1().CSISnapshotControllers().Get(context.TODO(), globalConfigName, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Failed to get CSISnapshotController %s: %v", globalConfigName, err)
 				}
