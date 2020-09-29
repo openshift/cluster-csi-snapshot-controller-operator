@@ -9,7 +9,7 @@ require (
 	github.com/google/go-cmp v0.5.0
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
-	github.com/openshift/api v0.0.0-20200916161728-83f0cb093902
+	github.com/openshift/api v0.0.0-20200929125329-c3027fc03b92
 	github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
 	github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
 	github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe
