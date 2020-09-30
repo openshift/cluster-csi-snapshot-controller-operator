@@ -7,5 +7,6 @@ RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe 
 FROM registry.svc.ci.openshift.org/openshift/origin-v4.6:base
 COPY --from=builder /go/src/github.com/openshift/cluster-csi-snapshot-controller-operator/csi-snapshot-controller-operator /usr/bin/
 COPY manifests /manifests
+COPY vendor/github.com/openshift/api/operator/v1/0000_80_csi_snapshot_controller_operator_01_crd.yaml manifests/01_config.crd.yaml
 ENTRYPOINT ["/usr/bin/csi-snapshot-controller-operator"]
 LABEL io.openshift.release.operator=true
