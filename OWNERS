@@ -4,3 +4,5 @@ approvers:
 - gnufied
 - bertinatto
 - huffmanca
+components: Storage
+subcomponent: Operators
