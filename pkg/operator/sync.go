@@ -159,8 +159,17 @@ func (c *csiSnapshotOperator) syncStatus(instance *operatorv1.CSISnapshotControl
 		instance.Status.ReadyReplicas = deployment.Status.UpdatedReplicas
 	}
 
-	c.setVersion("operator", c.operatorVersion)
-	c.setVersion("csi-snapshot-controller", c.operandVersion)
+	// Only set versions if we reached the desired state
+	isAvailable := v1helpers.IsOperatorConditionTrue(
+		instance.Status.Conditions,
+		operatorv1.OperatorStatusTypeAvailable)
+	isProgressing := v1helpers.IsOperatorConditionTrue(
+		instance.Status.Conditions,
+		operatorv1.OperatorStatusTypeProgressing)
+	if isAvailable && !isProgressing {
+		c.setVersion("operator", c.operatorVersion)
+		c.setVersion("csi-snapshot-controller", c.operandVersion)
+	}
 
 	return nil
 }
