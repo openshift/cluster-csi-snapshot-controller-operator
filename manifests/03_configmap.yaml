@@ -5,6 +5,8 @@ metadata:
   name: csi-snapshot-controller-operator-config
   labels:
     app: csi-snapshot-controller-operator
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
 data:
   operator-config.yaml: |
     apiVersion: operator.openshift.io/v1alpha1
