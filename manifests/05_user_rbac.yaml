@@ -12,6 +12,7 @@ metadata:
     rbac.authorization.k8s.io/aggregate-to-edit: "true"
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
   annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
 rules:
 - apiGroups: ["snapshot.storage.k8s.io"]
@@ -31,6 +32,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     rbac.authorization.k8s.io/aggregate-to-view: "true"
   annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
 rules:
 - apiGroups: ["snapshot.storage.k8s.io"]
@@ -50,6 +52,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     authorization.openshift.io/aggregate-to-basic-user: "true"
   annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
 rules:
 - apiGroups: ["snapshot.storage.k8s.io"]
@@ -70,6 +73,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     storage.openshift.io/aggregate-to-storage-admin: "true"
   annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
 rules:
 - apiGroups: ["snapshot.storage.k8s.io"]
