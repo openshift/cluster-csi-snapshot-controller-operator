@@ -6,6 +6,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	operatorconfigclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 	operatorclientinformers "github.com/openshift/client-go/operator/informers/externalversions"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -15,8 +16,9 @@ const (
 )
 
 type OperatorClient struct {
-	Informers operatorclientinformers.SharedInformerFactory
-	Client    operatorconfigclient.CSISnapshotControllersGetter
+	Informers          operatorclientinformers.SharedInformerFactory
+	Client             operatorconfigclient.CSISnapshotControllersGetter
+	ExpectedConditions []string
 }
 
 func (c OperatorClient) Informer() cache.SharedIndexInformer {
@@ -62,6 +64,8 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 	if err != nil {
 		return nil, err
 	}
+	c.addMissingConditions(status)
+
 	copy := original.DeepCopy()
 	copy.ResourceVersion = resourceVersion
 	copy.Status.OperatorStatus = *status
@@ -72,6 +76,33 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 	}
 
 	return &ret.Status.OperatorStatus, nil
+}
+
+// addMissingConditions adds all conditions that must be present to compute proper OperatorStatus CR.
+// Since several controllers run in parallel, we must ensure that whichever controller runs the first sync,
+// it must report conditions of the other controllers too.
+func (c *OperatorClient) addMissingConditions(status *operatorv1.OperatorStatus) {
+	for _, cndType := range c.ExpectedConditions {
+		if !c.isConditionSet(status, cndType) {
+			cnd := operatorv1.OperatorCondition{
+				Type:               cndType,
+				Status:             operatorv1.ConditionUnknown,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "InitalSync",
+				Message:            "Waiting for the initial sync of the operator",
+			}
+			v1helpers.SetOperatorCondition(&status.Conditions, cnd)
+		}
+	}
+}
+
+func (c *OperatorClient) isConditionSet(status *operatorv1.OperatorStatus, cndType string) bool {
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == cndType {
+			return true
+		}
+	}
+	return false
 }
 
 func (c OperatorClient) GetOperatorInstance() (*operatorv1.CSISnapshotController, error) {

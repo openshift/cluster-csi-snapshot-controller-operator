@@ -1,0 +1,54 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-snapshot-webhook
+  namespace: openshift-cluster-storage-operator
+spec:
+  serviceName: "csi-snapshot-webhook"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-snapshot-webhook
+  template:
+    metadata:
+      labels:
+        app: csi-snapshot-webhook
+    spec:
+      containers:
+      - name: webhook
+        image: ${WEBHOOK_IMAGE}
+        args:
+          - --tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt
+          - --tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key
+          - "--v=${LOG_LEVEL}"
+        ports:
+        - containerPort: 443
+        volumeMounts:
+          - name: certs
+            mountPath: /etc/snapshot-validation-webhook/certs
+            readOnly: true
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 10m
+      priorityClassName: "system-cluster-critical"
+      restartPolicy: Always
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      volumes:
+      - name: certs
+        secret:
+          secretName: csi-snapshot-webhook-secret
+      tolerations:
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: "NoSchedule"
+

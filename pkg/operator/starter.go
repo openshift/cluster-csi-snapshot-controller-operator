@@ -13,6 +13,7 @@ import (
 	csisnapshotconfigclient "github.com/openshift/client-go/operator/clientset/versioned"
 	informer "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operator/webhookdeployment"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
@@ -52,9 +53,15 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	configInformers := configinformer.NewSharedInformerFactoryWithOptions(configClient, resync)
 
 	operatorClient := &operatorclient.OperatorClient{
-		csiConfigInformers,
-		csiConfigClient.OperatorV1(),
+		Informers: csiConfigInformers,
+		Client:    csiConfigClient.OperatorV1(),
+		ExpectedConditions: []string{
+			operatorv1.OperatorStatusTypeAvailable,
+			webhookdeployment.WebhookControllerName + operatorv1.OperatorStatusTypeAvailable,
+		},
 	}
+
+	kubeClient := ctrlctx.ClientBuilder.KubeClientOrDie(targetName)
 
 	versionGetter := status.NewVersionGetter()
 
@@ -63,11 +70,18 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlctx.APIExtInformerFactory.Apiextensions().V1().CustomResourceDefinitions(),
 		ctrlctx.ClientBuilder.APIExtClientOrDie(targetName),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
-		ctrlctx.ClientBuilder.KubeClientOrDie(targetName),
+		kubeClient,
 		versionGetter,
 		controllerConfig.EventRecorder,
 		os.Getenv(operatorVersionEnvName),
 		os.Getenv(operandVersionEnvName),
+		os.Getenv(operandImageEnvName),
+	)
+
+	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(*operatorClient,
+		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
+		kubeClient,
+		controllerConfig.EventRecorder,
 		os.Getenv(operandImageEnvName),
 	)
 
@@ -109,6 +123,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		clusterOperatorStatus,
 		logLevelController,
 		managementStateController,
+		webhookOperator,
 	} {
 		go controller.Run(ctx, 1)
 	}
