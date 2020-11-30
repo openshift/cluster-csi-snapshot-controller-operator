@@ -13,6 +13,7 @@ import (
 	csisnapshotconfigclient "github.com/openshift/client-go/operator/clientset/versioned"
 	informer "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
@@ -40,7 +41,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}
 
 	csiConfigInformers := informer.NewSharedInformerFactoryWithOptions(csiConfigClient, resync,
-		informer.WithTweakListOptions(singleNameListOptions(globalConfigName)),
+		informer.WithTweakListOptions(singleNameListOptions(operatorclient.GlobalConfigName)),
 	)
 
 	configClient, err := configclient.NewForConfig(controllerConfig.KubeConfig)
@@ -50,7 +51,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	configInformers := configinformer.NewSharedInformerFactoryWithOptions(configClient, resync)
 
-	operatorClient := &OperatorClient{
+	operatorClient := &operatorclient.OperatorClient{
 		csiConfigInformers,
 		csiConfigClient.OperatorV1(),
 	}
@@ -75,7 +76,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		[]configv1.ObjectReference{
 			{Resource: "namespaces", Name: targetNamespace},
 			{Resource: "namespaces", Name: operatorNamespace},
-			{Group: operatorv1.GroupName, Resource: "csisnapshotcontrollers", Name: globalConfigName},
+			{Group: operatorv1.GroupName, Resource: "csisnapshotcontrollers", Name: operatorclient.GlobalConfigName},
 		},
 		configClient.ConfigV1(),
 		configInformers.Config().V1().ClusterOperators(),

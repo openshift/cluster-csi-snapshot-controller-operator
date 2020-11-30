@@ -1,16 +1,17 @@
-package operator
+package operatorclient
 
 import (
 	"context"
 
-	"k8s.io/client-go/tools/cache"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	operatorv1 "github.com/openshift/api/operator/v1"
-
 	operatorconfigclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 	operatorclientinformers "github.com/openshift/client-go/operator/informers/externalversions"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
+)
+
+const (
+	GlobalConfigName = "cluster"
 )
 
 type OperatorClient struct {
@@ -23,7 +24,7 @@ func (c OperatorClient) Informer() cache.SharedIndexInformer {
 }
 
 func (c OperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
+	instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(GlobalConfigName)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -32,7 +33,7 @@ func (c OperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv
 }
 
 func (c OperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
-	instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
+	instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(GlobalConfigName)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func (c OperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
 }
 
 func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
-	original, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
+	original, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(GlobalConfigName)
 	if err != nil {
 		return nil, "", err
 	}
@@ -57,7 +58,7 @@ func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operato
 }
 
 func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
-	original, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
+	original, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(GlobalConfigName)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +75,7 @@ func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *ope
 }
 
 func (c OperatorClient) GetOperatorInstance() (*operatorv1.CSISnapshotController, error) {
-	instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(globalConfigName)
+	instance, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(GlobalConfigName)
 	if err != nil {
 		return nil, err
 	}

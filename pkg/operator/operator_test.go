@@ -11,6 +11,7 @@ import (
 	fakeop "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	opinformers "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
@@ -113,7 +114,7 @@ func newOperator(test operatorTest) *testContext {
 	// Add global reactors
 	addGenerationReactor(coreClient)
 
-	client := OperatorClient{
+	client := operatorclient.OperatorClient{
 		Client:    operatorClient.OperatorV1(),
 		Informers: operatorInformerFactory,
 	}
@@ -733,9 +734,9 @@ func TestSync(t *testing.T) {
 			}
 			// Check expectedObjects.csiSnapshotController
 			if test.expectedObjects.csiSnapshotController != nil {
-				actualCSISnapshotController, err := ctx.operatorClient.OperatorV1().CSISnapshotControllers().Get(context.TODO(), globalConfigName, metav1.GetOptions{})
+				actualCSISnapshotController, err := ctx.operatorClient.OperatorV1().CSISnapshotControllers().Get(context.TODO(), operatorclient.GlobalConfigName, metav1.GetOptions{})
 				if err != nil {
-					t.Errorf("Failed to get CSISnapshotController %s: %v", globalConfigName, err)
+					t.Errorf("Failed to get CSISnapshotController %s: %v", operatorclient.GlobalConfigName, err)
 				}
 				sanitizeCSISnapshotController(actualCSISnapshotController)
 				sanitizeCSISnapshotController(test.expectedObjects.csiSnapshotController)
