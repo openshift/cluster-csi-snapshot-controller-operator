@@ -82,7 +82,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		kubeClient,
 		controllerConfig.EventRecorder,
-		os.Getenv(operandImageEnvName),
+		os.Getenv(webhookImageEnvName),
 	)
 
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(

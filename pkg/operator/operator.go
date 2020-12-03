@@ -39,6 +39,7 @@ const (
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
 	operandImageEnvName    = "OPERAND_IMAGE"
+	webhookImageEnvName    = "WEBHOOK_IMAGE"
 
 	maxRetries = 15
 )
