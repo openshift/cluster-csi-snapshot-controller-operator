@@ -21,8 +21,9 @@ spec:
           - --tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt
           - --tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key
           - "--v=${LOG_LEVEL}"
+          - --port=8443
         ports:
-        - containerPort: 443
+        - containerPort: 8443
         volumeMounts:
           - name: certs
             mountPath: /etc/snapshot-validation-webhook/certs

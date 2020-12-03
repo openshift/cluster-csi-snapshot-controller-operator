@@ -261,8 +261,8 @@ func addGenerationReactor(client *fakecore.Clientset) {
 func TestSync(t *testing.T) {
 	const replica1 = 1
 	const defaultImage = "csi-snahpshot-webhook-image"
-	var argsLevel2 = []string{"--tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt", "--tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key", "--v=2"}
-	var argsLevel6 = []string{"--tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt", "--tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key", "--v=6"}
+	var argsLevel2 = []string{"--tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt", "--tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key", "--v=2", "--port=8443"}
+	var argsLevel6 = []string{"--tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt", "--tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key", "--v=6", "--port=8443"}
 
 	tests := []operatorTest{
 		{
