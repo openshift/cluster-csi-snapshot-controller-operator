@@ -33,6 +33,9 @@ spec:
         env:
         - name: OPERAND_IMAGE
           value: quay.io/openshift/origin-csi-snapshot-controller
+        - name: WEBHOOK_IMAGE
+          # TODO: replace with quay.io image
+          value: registry.svc.ci.openshift.org/ocp/4.7:csi-snapshot-validation-webhook
         - name: OPERATOR_IMAGE_VERSION
           value: "0.0.1-snapshot"
         - name: OPERAND_IMAGE_VERSION

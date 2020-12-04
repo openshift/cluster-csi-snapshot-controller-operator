@@ -4,6 +4,7 @@
 // assets/volumesnapshotclasses.yaml
 // assets/volumesnapshotcontents.yaml
 // assets/volumesnapshots.yaml
+// assets/webhook_deployment.yaml
 package generated
 
 import (
@@ -670,6 +671,78 @@ func volumesnapshotsYaml() (*asset, error) {
 	return a, nil
 }
 
+var _webhook_deploymentYaml = []byte(`kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-snapshot-webhook
+  namespace: openshift-cluster-storage-operator
+spec:
+  serviceName: "csi-snapshot-webhook"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-snapshot-webhook
+  template:
+    metadata:
+      labels:
+        app: csi-snapshot-webhook
+    spec:
+      containers:
+      - name: webhook
+        image: ${WEBHOOK_IMAGE}
+        args:
+          - --tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt
+          - --tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key
+          - "--v=${LOG_LEVEL}"
+          - --port=8443
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+          - name: certs
+            mountPath: /etc/snapshot-validation-webhook/certs
+            readOnly: true
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 10m
+      priorityClassName: "system-cluster-critical"
+      restartPolicy: Always
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      volumes:
+      - name: certs
+        secret:
+          secretName: csi-snapshot-webhook-secret
+      tolerations:
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: "NoSchedule"
+
+`)
+
+func webhook_deploymentYamlBytes() ([]byte, error) {
+	return _webhook_deploymentYaml, nil
+}
+
+func webhook_deploymentYaml() (*asset, error) {
+	bytes, err := webhook_deploymentYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "webhook_deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -726,6 +799,7 @@ var _bindata = map[string]func() (*asset, error){
 	"volumesnapshotclasses.yaml":     volumesnapshotclassesYaml,
 	"volumesnapshotcontents.yaml":    volumesnapshotcontentsYaml,
 	"volumesnapshots.yaml":           volumesnapshotsYaml,
+	"webhook_deployment.yaml":        webhook_deploymentYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -773,6 +847,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"volumesnapshotclasses.yaml":     {volumesnapshotclassesYaml, map[string]*bintree{}},
 	"volumesnapshotcontents.yaml":    {volumesnapshotcontentsYaml, map[string]*bintree{}},
 	"volumesnapshots.yaml":           {volumesnapshotsYaml, map[string]*bintree{}},
+	"webhook_deployment.yaml":        {webhook_deploymentYaml, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory

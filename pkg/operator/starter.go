@@ -13,6 +13,8 @@ import (
 	csisnapshotconfigclient "github.com/openshift/client-go/operator/clientset/versioned"
 	informer "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operator/webhookdeployment"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
@@ -40,7 +42,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}
 
 	csiConfigInformers := informer.NewSharedInformerFactoryWithOptions(csiConfigClient, resync,
-		informer.WithTweakListOptions(singleNameListOptions(globalConfigName)),
+		informer.WithTweakListOptions(singleNameListOptions(operatorclient.GlobalConfigName)),
 	)
 
 	configClient, err := configclient.NewForConfig(controllerConfig.KubeConfig)
@@ -50,10 +52,16 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	configInformers := configinformer.NewSharedInformerFactoryWithOptions(configClient, resync)
 
-	operatorClient := &OperatorClient{
-		csiConfigInformers,
-		csiConfigClient.OperatorV1(),
+	operatorClient := &operatorclient.OperatorClient{
+		Informers: csiConfigInformers,
+		Client:    csiConfigClient.OperatorV1(),
+		ExpectedConditions: []string{
+			operatorv1.OperatorStatusTypeAvailable,
+			webhookdeployment.WebhookControllerName + operatorv1.OperatorStatusTypeAvailable,
+		},
 	}
+
+	kubeClient := ctrlctx.ClientBuilder.KubeClientOrDie(targetName)
 
 	versionGetter := status.NewVersionGetter()
 
@@ -62,7 +70,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlctx.APIExtInformerFactory.Apiextensions().V1().CustomResourceDefinitions(),
 		ctrlctx.ClientBuilder.APIExtClientOrDie(targetName),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
-		ctrlctx.ClientBuilder.KubeClientOrDie(targetName),
+		kubeClient,
 		versionGetter,
 		controllerConfig.EventRecorder,
 		os.Getenv(operatorVersionEnvName),
@@ -70,12 +78,19 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		os.Getenv(operandImageEnvName),
 	)
 
+	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(*operatorClient,
+		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
+		kubeClient,
+		controllerConfig.EventRecorder,
+		os.Getenv(webhookImageEnvName),
+	)
+
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
 		targetName,
 		[]configv1.ObjectReference{
 			{Resource: "namespaces", Name: targetNamespace},
 			{Resource: "namespaces", Name: operatorNamespace},
-			{Group: operatorv1.GroupName, Resource: "csisnapshotcontrollers", Name: globalConfigName},
+			{Group: operatorv1.GroupName, Resource: "csisnapshotcontrollers", Name: operatorclient.GlobalConfigName},
 		},
 		configClient.ConfigV1(),
 		configInformers.Config().V1().ClusterOperators(),
@@ -108,6 +123,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		clusterOperatorStatus,
 		logLevelController,
 		managementStateController,
+		webhookOperator,
 	} {
 		go controller.Run(ctx, 1)
 	}

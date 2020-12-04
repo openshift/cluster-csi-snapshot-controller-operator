@@ -6,6 +6,7 @@ import (
 	"time"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	corev1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextinformersv1 "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
@@ -34,11 +35,11 @@ const (
 	targetName        = "csi-snapshot-controller"
 	targetNamespace   = "openshift-cluster-storage-operator"
 	operatorNamespace = "openshift-cluster-storage-operator"
-	globalConfigName  = "cluster"
 
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
 	operandImageEnvName    = "OPERAND_IMAGE"
+	webhookImageEnvName    = "WEBHOOK_IMAGE"
 
 	maxRetries = 15
 )
@@ -49,7 +50,7 @@ var (
 )
 
 type csiSnapshotOperator struct {
-	client        OperatorClient
+	client        operatorclient.OperatorClient
 	kubeClient    kubernetes.Interface
 	versionGetter status.VersionGetter
 	eventRecorder events.Recorder
@@ -70,7 +71,7 @@ type csiSnapshotOperator struct {
 }
 
 func NewCSISnapshotControllerOperator(
-	client OperatorClient,
+	client operatorclient.OperatorClient,
 	crdInformer apiextinformersv1.CustomResourceDefinitionInformer,
 	crdClient apiextclient.Interface,
 	deployInformer appsinformersv1.DeploymentInformer,
@@ -233,7 +234,7 @@ func (c *csiSnapshotOperator) enqueue(obj interface{}) {
 	}
 	// Sync corresponding CSISnapshotController instance. Since there is only one, sync that one.
 	// It will check all other objects (CRDs, Deployment) and update/overwrite them as needed.
-	c.queue.Add(globalConfigName)
+	c.queue.Add(operatorclient.GlobalConfigName)
 }
 
 func (c *csiSnapshotOperator) eventHandler(kind string) cache.ResourceEventHandler {
