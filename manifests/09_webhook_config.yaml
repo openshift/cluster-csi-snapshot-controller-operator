@@ -8,6 +8,7 @@ metadata:
   annotations:
     service.beta.openshift.io/inject-cabundle: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-production-edge: "true"
 webhooks:
   - name: volumesnapshotclasses.snapshot.storage.k8s.io
     clientConfig:
