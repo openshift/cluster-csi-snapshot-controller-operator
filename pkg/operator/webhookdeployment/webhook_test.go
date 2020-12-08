@@ -15,6 +15,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -43,25 +44,33 @@ type testContext struct {
 
 type testObjects struct {
 	deployment            *appsv1.Deployment
+	webhookConfig         *admissionv1.ValidatingWebhookConfiguration
 	csiSnapshotController *opv1.CSISnapshotController
 }
 
 const (
 	deploymentName      = "csi-snapshot-webhook"
 	deploymentNamespace = "openshift-cluster-storage-operator"
+	webhookName         = "snapshot.storage.k8s.io"
 )
 
 func newOperator(test operatorTest) *testContext {
 	// Convert to []runtime.Object
-	var initialDeployments []runtime.Object
+	var initialObjects []runtime.Object
 	if test.initialObjects.deployment != nil {
-		initialDeployments = []runtime.Object{test.initialObjects.deployment}
+		initialObjects = append(initialObjects, test.initialObjects.deployment)
 	}
-	coreClient := fakecore.NewSimpleClientset(initialDeployments...)
+	if test.initialObjects.webhookConfig != nil {
+		initialObjects = append(initialObjects, test.initialObjects.webhookConfig)
+	}
+	coreClient := fakecore.NewSimpleClientset(initialObjects...)
 	coreInformerFactory := coreinformers.NewSharedInformerFactory(coreClient, 0 /*no resync */)
 	// Fill the informer
 	if test.initialObjects.deployment != nil {
 		coreInformerFactory.Apps().V1().Deployments().Informer().GetIndexer().Add(test.initialObjects.deployment)
+	}
+	if test.initialObjects.webhookConfig != nil {
+		coreInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations().Informer().GetIndexer().Add(test.initialObjects.webhookConfig)
 	}
 
 	// Convert to []runtime.Object
@@ -88,6 +97,7 @@ func newOperator(test operatorTest) *testContext {
 	ctrl := NewCSISnapshotWebhookController(
 		client,
 		coreInformerFactory.Apps().V1().Deployments(),
+		coreInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations(),
 		coreClient,
 		recorder,
 		test.image,
@@ -143,7 +153,7 @@ func withGeneration(generations ...int64) csiSnapshotControllerModifier {
 	}
 }
 
-func withGenerations(depolymentGeneration int64) csiSnapshotControllerModifier {
+func withGenerations(depolymentGeneration, webhookGeneration int64) csiSnapshotControllerModifier {
 
 	return func(i *opv1.CSISnapshotController) *opv1.CSISnapshotController {
 		i.Status.Generations = []opv1.GenerationStatus{
@@ -153,6 +163,13 @@ func withGenerations(depolymentGeneration int64) csiSnapshotControllerModifier {
 				Name:           deploymentName,
 				Namespace:      deploymentNamespace,
 				Resource:       "deployments",
+			},
+			{
+				Group:          admissionv1.GroupName,
+				LastGeneration: webhookGeneration,
+				Name:           webhookName,
+				Namespace:      "",
+				Resource:       "validatingwebhookconfigurations",
 			},
 		}
 		return i
@@ -239,6 +256,31 @@ func withDeploymentGeneration(generations ...int64) deploymentModifier {
 	}
 }
 
+// ValidatingWebhookConfiguration
+
+type validatingWebhookConfigurationModifier func(*admissionv1.ValidatingWebhookConfiguration) *admissionv1.ValidatingWebhookConfiguration
+
+func validatingWebhookConfiguration(generation int64, modifiers ...validatingWebhookConfigurationModifier) *admissionv1.ValidatingWebhookConfiguration {
+	instance, err := getWebhookConfig()
+	if err != nil {
+		panic(err)
+	}
+	instance.Generation = generation
+	for _, modifier := range modifiers {
+		instance = modifier(instance)
+	}
+	return instance
+}
+
+func withWebhookPort(port int32) validatingWebhookConfigurationModifier {
+	return func(instance *admissionv1.ValidatingWebhookConfiguration) *admissionv1.ValidatingWebhookConfiguration {
+		for i := range instance.Webhooks {
+			instance.Webhooks[i].ClientConfig.Service.Port = &port
+		}
+		return instance
+	}
+}
+
 // This reactor is always enabled and bumps Deployment generation when it gets updated.
 func addGenerationReactor(client *fakecore.Clientset) {
 	client.PrependReactor("*", "deployments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -253,6 +295,21 @@ func addGenerationReactor(client *fakecore.Clientset) {
 			deployment := object.(*appsv1.Deployment)
 			deployment.Generation++
 			return false, deployment, nil
+		}
+		return false, nil, nil
+	})
+	client.PrependReactor("*", "validatingwebhookconfigurations", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		switch a := action.(type) {
+		case core.CreateActionImpl:
+			object := a.GetObject()
+			webhook := object.(*admissionv1.ValidatingWebhookConfiguration)
+			webhook.Generation++
+			return false, webhook, nil
+		case core.UpdateActionImpl:
+			object := a.GetObject()
+			webhook := object.(*admissionv1.ValidatingWebhookConfiguration)
+			webhook.Generation++
+			return false, webhook, nil
 		}
 		return false, nil, nil
 	})
@@ -273,9 +330,10 @@ func TestSync(t *testing.T) {
 				csiSnapshotController: csiSnapshotController(),
 			},
 			expectedObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 0)),
+				deployment:    getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 0)),
+				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
-					withGenerations(1),
+					withGenerations(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeProgressing),
 					withFalseConditions(opv1.OperatorStatusTypeAvailable)),
 			},
@@ -286,12 +344,13 @@ func TestSync(t *testing.T) {
 			image: defaultImage,
 			initialObjects: testObjects{
 				deployment:            getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
-				csiSnapshotController: csiSnapshotController(withGenerations(1)),
+				csiSnapshotController: csiSnapshotController(withGenerations(1, 1)),
 			},
 			expectedObjects: testObjects{
-				deployment: getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
+				deployment:    getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
+				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
-					withGenerations(1),
+					withGenerations(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable),
 					withFalseConditions(opv1.OperatorStatusTypeProgressing)),
 			},
@@ -305,15 +364,17 @@ func TestSync(t *testing.T) {
 					withDeploymentReplicas(2),      // User changed replicas
 					withDeploymentGeneration(2, 1), // ... which changed Generation
 					withDeploymentStatus(replica1, replica1, replica1)),
-				csiSnapshotController: csiSnapshotController(withGenerations(1)), // the operator knows the old generation of the Deployment
+				webhookConfig:         validatingWebhookConfiguration(1),
+				csiSnapshotController: csiSnapshotController(withGenerations(1, 1)), // the operator knows the old generation of the Deployment
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentReplicas(1),      // The operator fixed replica count
 					withDeploymentGeneration(3, 1), // ... which bumps generation again
 					withDeploymentStatus(replica1, replica1, replica1)),
+				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
-					withGenerations(3), // now the operator knows generation 1
+					withGenerations(3, 1), // now the operator knows generation 1
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeProgressing), // Progressing due to Generation change
 					withFalseConditions()),
 			},
@@ -326,8 +387,9 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // the Deployment has no pods
+				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
-					withGenerations(1),
+					withGenerations(1, 1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable),
 					withFalseConditions(opv1.OperatorStatusTypeProgressing)),
@@ -336,8 +398,9 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // No change to the Deployment
+				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
-					withGenerations(1),
+					withGenerations(1, 1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeProgressing), // The operator is Progressing
 					withFalseConditions(opv1.OperatorStatusTypeAvailable)), // The operator is not Available (no replica is running...)
@@ -351,8 +414,9 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1 /*ready*/, 1 /*available*/, 0 /*updated*/)), // the Deployment is updating 1 pod
+				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
-					withGenerations(1),
+					withGenerations(1, 1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable),
 					withFalseConditions(opv1.OperatorStatusTypeProgressing)),
@@ -361,8 +425,9 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1, 1, 0)), // No change to the Deployment
+				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
-					withGenerations(1),
+					withGenerations(1, 1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeProgressing), // The operator is Progressing, but still Available
 					withFalseConditions()),
@@ -376,8 +441,9 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
+				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
-					withGenerations(1),
+					withGenerations(1, 1),
 					withLogLevel(opv1.Trace), // User changed the log level...
 					withGeneration(2, 1)),    //... which caused the Generation to increase
 			},
@@ -385,12 +451,37 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel6, defaultImage, // The operator changed cmdline arguments with a new log level
 					withDeploymentGeneration(2, 1), // ... which caused the Generation to increase
 					withDeploymentStatus(replica1, replica1, replica1)),
+				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
 					withLogLevel(opv1.Trace),
-					withGenerations(2),
+					withGenerations(2, 1),
 					withGeneration(2, 1), // Webhook Deployment does not update the CR, only the main controller does so.
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeProgressing), // Progressing due to Generation change
 					withFalseConditions()),
+			},
+		},
+		{
+			// Webhook is updated by user and gets replaced by the operator.
+			name:  "webhook modified by user",
+			image: defaultImage,
+			initialObjects: testObjects{
+				deployment: getDeployment(argsLevel2, defaultImage,
+					withDeploymentReplicas(1),
+					withDeploymentGeneration(1, 1),
+					withDeploymentStatus(replica1, replica1, replica1)),
+				webhookConfig:         validatingWebhookConfiguration(2, withWebhookPort(8080)), // Use changed the port, which changed the generation
+				csiSnapshotController: csiSnapshotController(withGenerations(1, 1)),             // the operator knows the old generation of the webhook
+			},
+			expectedObjects: testObjects{
+				deployment: getDeployment(argsLevel2, defaultImage,
+					withDeploymentReplicas(1),
+					withDeploymentGeneration(1, 1),
+					withDeploymentStatus(replica1, replica1, replica1)),
+				webhookConfig: validatingWebhookConfiguration(3), // the webhook port was fixed + generation bumped
+				csiSnapshotController: csiSnapshotController(
+					withGenerations(1, 3),
+					withTrueConditions(opv1.OperatorStatusTypeAvailable),
+					withFalseConditions(opv1.OperatorStatusTypeProgressing)),
 			},
 		},
 	}
@@ -425,6 +516,18 @@ func TestSync(t *testing.T) {
 					t.Errorf("Unexpected Deployment %+v content:\n%s", deploymentName, cmp.Diff(test.expectedObjects.deployment, actualDeployment))
 				}
 			}
+			// Check expectedObjects.webhookConfig
+			if test.expectedObjects.webhookConfig != nil {
+				actualWebhookConfig, err := ctx.coreClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.TODO(), webhookName, metav1.GetOptions{})
+				if err != nil {
+					t.Errorf("Failed to get ValidatingWebhookConfiguration %s: %v", webhookName, err)
+				}
+				sanitizeWebhookConfig(actualWebhookConfig)
+				sanitizeWebhookConfig(test.expectedObjects.webhookConfig)
+				if !equality.Semantic.DeepEqual(test.expectedObjects.webhookConfig, actualWebhookConfig) {
+					t.Errorf("Unexpected ValidatingWebhookConfiguration %+v content:\n%s", webhookName, cmp.Diff(test.expectedObjects.webhookConfig, actualWebhookConfig))
+				}
+			}
 			// Check expectedObjects.csiSnapshotController
 			if test.expectedObjects.csiSnapshotController != nil {
 				actualCSISnapshotController, err := ctx.operatorClient.OperatorV1().CSISnapshotControllers().Get(context.TODO(), operatorclient.GlobalConfigName, metav1.GetOptions{})
@@ -451,6 +554,26 @@ func sanitizeDeployment(deployment *appsv1.Deployment) {
 	}
 	if deployment.Annotations != nil {
 		deployment.Annotations["operator.openshift.io/spec-hash"] = ""
+	}
+}
+
+func sanitizeWebhookConfig(webhookConfig *admissionv1.ValidatingWebhookConfiguration) {
+	// nil and empty array are the same
+	if len(webhookConfig.Labels) == 0 {
+		webhookConfig.Labels = nil
+	}
+	if len(webhookConfig.Annotations) == 0 {
+		webhookConfig.Annotations = nil
+	}
+	if webhookConfig.Annotations != nil {
+		webhookConfig.Annotations["operator.openshift.io/spec-hash"] = ""
+	}
+	for i := range webhookConfig.Webhooks {
+		// port 443 is defaulted
+		if webhookConfig.Webhooks[i].ClientConfig.Service.Port == nil {
+			var port int32 = 443
+			webhookConfig.Webhooks[i].ClientConfig.Service.Port = &port
+		}
 	}
 }
 

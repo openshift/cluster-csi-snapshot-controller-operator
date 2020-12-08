@@ -1,8 +1,7 @@
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: snapshot.storage.k8s.io
-  namespace: csi-snapshot-controller-operator
   labels:
     app: csi-snapshot-webhook
   annotations:
@@ -14,11 +13,14 @@ webhooks:
       service:
         name: csi-snapshot-webhook
         namespace: openshift-cluster-storage-operator
-        path: "/volumesnapshot"
+        path: /volumesnapshot
     rules:
       - operations: [ "CREATE", "UPDATE" ]
         apiGroups: ["snapshot.storage.k8s.io"]
         apiVersions: ["v1beta1"]
         resources: ["volumesnapshots", "volumesnapshotcontents"]
+    admissionReviewVersions:
+      - v1
+      - v1beta1
     sideEffects: None
     failurePolicy: Ignore
