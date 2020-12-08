@@ -27,7 +27,7 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            memory: 50Mi
+            memory: 65Mi
             cpu: 10m
         args: [ "start", "-v", "5" , "--config=/var/run/configmaps/config/operator-config.yaml"]
         env:

@@ -705,6 +705,7 @@ spec:
         resources:
           requests:
             cpu: 10m
+            memory: 20Mi
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
       nodeSelector:
