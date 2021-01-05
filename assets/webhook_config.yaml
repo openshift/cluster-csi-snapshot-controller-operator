@@ -17,7 +17,7 @@ webhooks:
     rules:
       - operations: [ "CREATE", "UPDATE" ]
         apiGroups: ["snapshot.storage.k8s.io"]
-        apiVersions: ["v1beta1"]
+        apiVersions: ["v1beta1", "v1"]
         resources: ["volumesnapshots", "volumesnapshotcontents"]
     admissionReviewVersions:
       - v1
