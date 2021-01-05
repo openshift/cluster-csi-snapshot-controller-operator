@@ -4,6 +4,7 @@
 // assets/volumesnapshotclasses.yaml
 // assets/volumesnapshotcontents.yaml
 // assets/volumesnapshots.yaml
+// assets/webhook_config.yaml
 // assets/webhook_deployment.yaml
 package generated
 
@@ -799,6 +800,49 @@ func volumesnapshotsYaml() (*asset, error) {
 	return a, nil
 }
 
+var _webhook_configYaml = []byte(`apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: snapshot.storage.k8s.io
+  labels:
+    app: csi-snapshot-webhook
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+webhooks:
+  - name: volumesnapshotclasses.snapshot.storage.k8s.io
+    clientConfig:
+      service:
+        name: csi-snapshot-webhook
+        namespace: openshift-cluster-storage-operator
+        path: /volumesnapshot
+    rules:
+      - operations: [ "CREATE", "UPDATE" ]
+        apiGroups: ["snapshot.storage.k8s.io"]
+        apiVersions: ["v1beta1"]
+        resources: ["volumesnapshots", "volumesnapshotcontents"]
+    admissionReviewVersions:
+      - v1
+      - v1beta1
+    sideEffects: None
+    failurePolicy: Ignore
+`)
+
+func webhook_configYamlBytes() ([]byte, error) {
+	return _webhook_configYaml, nil
+}
+
+func webhook_configYaml() (*asset, error) {
+	bytes, err := webhook_configYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "webhook_config.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _webhook_deploymentYaml = []byte(`kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -928,6 +972,7 @@ var _bindata = map[string]func() (*asset, error){
 	"volumesnapshotclasses.yaml":     volumesnapshotclassesYaml,
 	"volumesnapshotcontents.yaml":    volumesnapshotcontentsYaml,
 	"volumesnapshots.yaml":           volumesnapshotsYaml,
+	"webhook_config.yaml":            webhook_configYaml,
 	"webhook_deployment.yaml":        webhook_deploymentYaml,
 }
 
@@ -976,6 +1021,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"volumesnapshotclasses.yaml":     {volumesnapshotclassesYaml, map[string]*bintree{}},
 	"volumesnapshotcontents.yaml":    {volumesnapshotcontentsYaml, map[string]*bintree{}},
 	"volumesnapshots.yaml":           {volumesnapshotsYaml, map[string]*bintree{}},
+	"webhook_config.yaml":            {webhook_configYaml, map[string]*bintree{}},
 	"webhook_deployment.yaml":        {webhook_deploymentYaml, map[string]*bintree{}},
 }}
 

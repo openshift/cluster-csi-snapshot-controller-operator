@@ -16,8 +16,12 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	admissionnformersv1 "k8s.io/client-go/informers/admissionregistration/v1"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
@@ -37,12 +41,26 @@ const (
 	WebhookControllerName = "CSISnapshotWebhookController"
 	webhookVersionName    = "CSISnapshotWebhookDeployment"
 	deploymentAsset       = "webhook_deployment.yaml"
+	webhookAsset          = "webhook_config.yaml"
 )
+
+var (
+	admissionScheme = runtime.NewScheme()
+	admissionCodecs = serializer.NewCodecFactory(admissionScheme)
+)
+
+func init() {
+	// Register admission/v1 schema for ValidatingWebhookConfiguration decoding
+	if err := admissionv1.AddToScheme(admissionScheme); err != nil {
+		panic(err)
+	}
+}
 
 // NewCSISnapshotWebhookController returns a controller that creates and manages Deployment with CSI snapshot webhook.
 func NewCSISnapshotWebhookController(
 	client operatorclient.OperatorClient,
 	deployInformer appsinformersv1.DeploymentInformer,
+	webhookInformer admissionnformersv1.ValidatingWebhookConfigurationInformer,
 	kubeClient kubernetes.Interface,
 	eventRecorder events.Recorder,
 	csiSnapshotWebhookImage string,
@@ -58,6 +76,7 @@ func NewCSISnapshotWebhookController(
 	return factory.New().WithSync(c.sync).WithSyncDegradedOnError(client).WithInformers(
 		client.Informer(),
 		deployInformer.Informer(),
+		webhookInformer.Informer(),
 	).ToController(WebhookControllerName, eventRecorder.WithComponentSuffix(WebhookControllerName))
 }
 
@@ -82,6 +101,16 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 	deployment, _, err = resourceapply.ApplyDeployment(c.kubeClient.AppsV1(), syncCtx.Recorder(), deployment, lastGeneration)
 	if err != nil {
 		// This will set Degraded condition
+		return err
+	}
+
+	webhookConfig, err := getWebhookConfig()
+	if err != nil {
+		return err
+	}
+	lastWebhookGeneration := resourcemerge.ExpectedValidatingWebhooksConfiguration(webhookConfig.Name, opStatus.Generations)
+	webhookConfig, _, err = resourceapply.ApplyValidatingWebhookConfiguration(c.kubeClient.AdmissionregistrationV1(), syncCtx.Recorder(), webhookConfig, lastWebhookGeneration)
+	if err != nil {
 		return err
 	}
 
@@ -122,6 +151,7 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 
 	updateGenerationFn := func(newStatus *operatorapi.OperatorStatus) error {
 		resourcemerge.SetDeploymentGeneration(&newStatus.Generations, deployment)
+		resourcemerge.SetValidatingWebhooksConfigurationGeneration(&newStatus.Generations, webhookConfig)
 		return nil
 	}
 
@@ -148,4 +178,17 @@ func (c *csiSnapshotWebhookController) getDeployment(opSpec *operatorapi.Operato
 	deployment := resourceread.ReadDeploymentV1OrDie([]byte(deploymentString))
 	return deployment, nil
 
+}
+
+func getWebhookConfig() (*admissionv1.ValidatingWebhookConfiguration, error) {
+	webhookBytes := generated.MustAsset(webhookAsset)
+	requiredObj, err := runtime.Decode(admissionCodecs.UniversalDecoder(admissionv1.SchemeGroupVersion), webhookBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	webhook := requiredObj.(*admissionv1.ValidatingWebhookConfiguration)
+	// Set hash of Webhooks[] to apply new ValidatingWebhookConfiguration when the asset changes on the operator update.
+	resourceapply.SetSpecHashAnnotation(&webhook.ObjectMeta, webhook.Webhooks)
+	return webhook, nil
 }

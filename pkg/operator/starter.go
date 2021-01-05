@@ -80,6 +80,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(*operatorClient,
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
+		ctrlctx.KubeNamespacedInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations(),
 		kubeClient,
 		controllerConfig.EventRecorder,
 		os.Getenv(webhookImageEnvName),
