@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	volumesnapshotsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
+	volumesnapshotsv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,23 +67,23 @@ func CreatePVC(namespace, scName string, uid types.UID, size int) *corev1.Persis
 }
 
 // CreateFakeSnapshot returns a fake VolumeSnapshot with the provided parameters
-func CreateFakeSnapshot(claimName, namespace, snapshotClassName string, uid types.UID) *volumesnapshotsv1beta1.VolumeSnapshot {
+func CreateFakeSnapshot(claimName, namespace, snapshotClassName string, uid types.UID) *volumesnapshotsv1.VolumeSnapshot {
 	snapshotName := "test-snapshot" + strconv.Itoa(rand.Intn(1000))
 	time := metav1.NewTime(time.Now())
-	snapshot := &volumesnapshotsv1beta1.VolumeSnapshot{
+	snapshot := &volumesnapshotsv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       snapshotName,
 			Namespace:  namespace,
 			UID:        uid,
 			Finalizers: []string{},
 		},
-		Spec: volumesnapshotsv1beta1.VolumeSnapshotSpec{
+		Spec: volumesnapshotsv1.VolumeSnapshotSpec{
 			VolumeSnapshotClassName: &snapshotClassName,
-			Source: volumesnapshotsv1beta1.VolumeSnapshotSource{
+			Source: volumesnapshotsv1.VolumeSnapshotSource{
 				PersistentVolumeClaimName: &claimName,
 			},
 		},
-		Status: &volumesnapshotsv1beta1.VolumeSnapshotStatus{
+		Status: &volumesnapshotsv1.VolumeSnapshotStatus{
 			CreationTime: &time,
 		},
 	}
@@ -91,12 +91,12 @@ func CreateFakeSnapshot(claimName, namespace, snapshotClassName string, uid type
 }
 
 // CreateFakeSnapshotClass returns a fake VolumeSnapshotClass with the provided parameters
-func CreateFakeSnapshotClass(driver string) *volumesnapshotsv1beta1.VolumeSnapshotClass {
+func CreateFakeSnapshotClass(driver string) *volumesnapshotsv1.VolumeSnapshotClass {
 	name := "test-snapshotclass" + strconv.Itoa(rand.Intn(1000))
-	class := &volumesnapshotsv1beta1.VolumeSnapshotClass{
+	class := &volumesnapshotsv1.VolumeSnapshotClass{
 		ObjectMeta:     metav1.ObjectMeta{Name: name},
 		Driver:         driver,
-		DeletionPolicy: volumesnapshotsv1beta1.VolumeSnapshotContentRetain,
+		DeletionPolicy: volumesnapshotsv1.VolumeSnapshotContentRetain,
 	}
 	return class
 }
