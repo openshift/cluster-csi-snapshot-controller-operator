@@ -13,12 +13,12 @@ import (
 	framework "github.com/openshift/cluster-csi-snapshot-controller-operator/test/framework"
 	kapierrs "k8s.io/apimachinery/pkg/api/errors"
 
-	volumesnapshotsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
+	volumesnapshotsv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 )
 
 const (
 	snapshotGroup      = "snapshot.storage.k8s.io"
-	snapshotAPIVersion = "snapshot.storage.k8s.io/v1beta1"
+	snapshotAPIVersion = "snapshot.storage.k8s.io/v1"
 
 	operatorNamespace = "openshift-cluster-storage-operator"
 	operatorName      = "csi-snapshot-controller-operator"
@@ -89,12 +89,12 @@ func TestCSISnapshotControllerOperator(t *testing.T) {
 
 	// Create the VolumeSnapshotClass
 	snapshotClass := CreateFakeSnapshotClass(driverName)
-	snapshotClass, err = client.SnapshotV1beta1Interface.VolumeSnapshotClasses().Create(context.TODO(), snapshotClass, metav1.CreateOptions{})
+	snapshotClass, err = client.SnapshotV1Interface.VolumeSnapshotClasses().Create(context.TODO(), snapshotClass, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error attempting to create VolumeSnapshotClass: %v", err)
 	}
 	defer func() {
-		err = client.SnapshotV1beta1Interface.VolumeSnapshotClasses().Delete(context.TODO(), snapshotClass.ObjectMeta.Name, metav1.DeleteOptions{})
+		err = client.SnapshotV1Interface.VolumeSnapshotClasses().Delete(context.TODO(), snapshotClass.ObjectMeta.Name, metav1.DeleteOptions{})
 		if err != nil {
 			t.Errorf("Error attempting to delete VolumeSnapshotClass: %v", err)
 		}
@@ -103,12 +103,12 @@ func TestCSISnapshotControllerOperator(t *testing.T) {
 
 	// Create the VolumeSnapshot
 	snapshot := CreateFakeSnapshot(pvc.ObjectMeta.Name, namespace, snapshotClass.ObjectMeta.Name, pvc.ObjectMeta.UID)
-	snapshot, err = client.SnapshotV1beta1Interface.VolumeSnapshots(namespace).Create(context.TODO(), snapshot, metav1.CreateOptions{})
+	snapshot, err = client.SnapshotV1Interface.VolumeSnapshots(namespace).Create(context.TODO(), snapshot, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error attempting to create VolumeSnapshot: %v", err)
 	}
 	defer func() {
-		err = client.SnapshotV1beta1Interface.VolumeSnapshots(namespace).Delete(context.TODO(), snapshot.ObjectMeta.Name, metav1.DeleteOptions{})
+		err = client.SnapshotV1Interface.VolumeSnapshots(namespace).Delete(context.TODO(), snapshot.ObjectMeta.Name, metav1.DeleteOptions{})
 		if err != nil {
 			t.Errorf("Error attempting to delete VolumeSnapshot: %v", err)
 		}
@@ -158,11 +158,11 @@ func createNamespace(t *testing.T, client *framework.ClientSet) (string, error) 
 // waitForSnapshotContent continually looks for a VolumeSnapshotContent that matches
 // the passed in VolumeSnapshot. It will search until a VolumeSnapshotContent is found
 // or until the timeout occurs.
-func waitForSnapshotContent(t *testing.T, client *framework.ClientSet, snapshot *volumesnapshotsv1beta1.VolumeSnapshot) (*volumesnapshotsv1beta1.VolumeSnapshotContent, error) {
+func waitForSnapshotContent(t *testing.T, client *framework.ClientSet, snapshot *volumesnapshotsv1.VolumeSnapshot) (*volumesnapshotsv1.VolumeSnapshotContent, error) {
 	snapshotName := snapshot.ObjectMeta.Name
 	t.Logf("Waiting up to %v for VolumeSnapshotContent to be found that matches %s", timeout, snapshotName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		content, err := client.SnapshotV1beta1Interface.VolumeSnapshotContents().List(context.TODO(), metav1.ListOptions{})
+		content, err := client.SnapshotV1Interface.VolumeSnapshotContents().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			t.Fatalf("Unable to retrieve list of VolumeSnapshotContents: %v", err)
 			continue
@@ -183,12 +183,12 @@ func waitForSnapshotContent(t *testing.T, client *framework.ClientSet, snapshot 
 // to the VolumeSnapshotContent. It will attempt to delete the VolumeSnapshotContent,
 // remove all Finalizers, and then query until the VolumeSnapshotContent can no longer
 // be found.
-func deleteSnapshotContent(t *testing.T, client *framework.ClientSet, snapshotContent *volumesnapshotsv1beta1.VolumeSnapshotContent) error {
+func deleteSnapshotContent(t *testing.T, client *framework.ClientSet, snapshotContent *volumesnapshotsv1.VolumeSnapshotContent) error {
 	name := snapshotContent.ObjectMeta.Name
 	deleted := false
 	t.Logf("Waiting up to 2m0s for snapshotContent %s to be deleted", name)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		clusterContent, err := client.SnapshotV1beta1Interface.VolumeSnapshotContents().Get(context.TODO(), name, metav1.GetOptions{})
+		clusterContent, err := client.SnapshotV1Interface.VolumeSnapshotContents().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil && !kapierrs.IsNotFound(err) {
 			t.Fatalf("Error attempting to get VolumeSnapshotContent: %v", err)
 			continue
@@ -197,14 +197,14 @@ func deleteSnapshotContent(t *testing.T, client *framework.ClientSet, snapshotCo
 			t.Logf("VolumeSnapshotContent %s successfully deleted", name)
 			return nil
 		} else if !deleted {
-			err := client.SnapshotV1beta1Interface.VolumeSnapshotContents().Delete(context.TODO(), name, metav1.DeleteOptions{})
+			err := client.SnapshotV1Interface.VolumeSnapshotContents().Delete(context.TODO(), name, metav1.DeleteOptions{})
 			if err != nil {
 				return err
 			}
 			deleted = true
 		} else {
 			clusterContent.ObjectMeta.Finalizers = nil
-			_, err = client.SnapshotV1beta1Interface.VolumeSnapshotContents().Update(context.TODO(), clusterContent, metav1.UpdateOptions{})
+			_, err = client.SnapshotV1Interface.VolumeSnapshotContents().Update(context.TODO(), clusterContent, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -215,14 +215,14 @@ func deleteSnapshotContent(t *testing.T, client *framework.ClientSet, snapshotCo
 
 // markSnapshotContentReady updates the status of the passed in VolumeSnapshotContent
 // to mark ReadyToUse true.
-func markSnapshotContentReady(t *testing.T, client *framework.ClientSet, snapshotContent *volumesnapshotsv1beta1.VolumeSnapshotContent) error {
+func markSnapshotContentReady(t *testing.T, client *framework.ClientSet, snapshotContent *volumesnapshotsv1.VolumeSnapshotContent) error {
 	ready := true
-	status := volumesnapshotsv1beta1.VolumeSnapshotContentStatus{
+	status := volumesnapshotsv1.VolumeSnapshotContentStatus{
 		ReadyToUse: &ready,
 	}
 	snapshotContent.Status = &status
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		_, err := client.SnapshotV1beta1Interface.VolumeSnapshotContents().UpdateStatus(context.TODO(), snapshotContent, metav1.UpdateOptions{})
+		_, err := client.SnapshotV1Interface.VolumeSnapshotContents().UpdateStatus(context.TODO(), snapshotContent, metav1.UpdateOptions{})
 		if err != nil {
 			t.Logf("Error updating VolumeSnapshotContent's %v status, retrying in %v: %v", snapshotContent.ObjectMeta.Name, poll, err)
 			continue
@@ -235,11 +235,11 @@ func markSnapshotContentReady(t *testing.T, client *framework.ClientSet, snapsho
 
 // WaitForSnapshotReady waits for a VolumeSnapshot to be ready to use
 // or until the timeout occurs, whichever comes first.
-func waitForSnapshotReady(client *framework.ClientSet, snapshot *volumesnapshotsv1beta1.VolumeSnapshot, t *testing.T, namespace string) error {
+func waitForSnapshotReady(client *framework.ClientSet, snapshot *volumesnapshotsv1.VolumeSnapshot, t *testing.T, namespace string) error {
 	snapshotName := snapshot.ObjectMeta.Name
 	t.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		snapshot, err := client.SnapshotV1beta1Interface.VolumeSnapshots(namespace).Get(context.TODO(), snapshot.ObjectMeta.Name, metav1.GetOptions{})
+		snapshot, err := client.SnapshotV1Interface.VolumeSnapshots(namespace).Get(context.TODO(), snapshot.ObjectMeta.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Logf("Failed to get claim %q, retrying in %v. Error: %v", snapshotName, poll, err)
 			continue
