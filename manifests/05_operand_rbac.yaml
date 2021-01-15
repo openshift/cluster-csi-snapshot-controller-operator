@@ -5,6 +5,7 @@ metadata:
   annotations:
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
@@ -39,6 +40,7 @@ metadata:
   annotations:
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
 subjects:
   - kind: ServiceAccount
     name: csi-snapshot-controller
@@ -57,6 +59,7 @@ metadata:
   annotations:
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
 rules:
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
@@ -71,6 +74,7 @@ metadata:
   annotations:
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
 subjects:
   - kind: ServiceAccount
     name: csi-snapshot-controller
