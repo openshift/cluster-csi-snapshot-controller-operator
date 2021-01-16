@@ -69,3 +69,7 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: "NoSchedule"
+      securityContext:
+        fsGroup: 10400
+        runAsGroup: 10400
+        runAsUser: 10400
