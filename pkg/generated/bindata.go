@@ -66,7 +66,7 @@ metadata:
   namespace: openshift-cluster-storage-operator
 spec:
   serviceName: "csi-snapshot-controller"
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: csi-snapshot-controller
@@ -103,6 +103,19 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: "NoSchedule"
+      # Try to place each pod on a different node.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - csi-snapshot-controller
+              topologyKey: kubernetes.io/hostname
 `)
 
 func csi_controller_deploymentYamlBytes() ([]byte, error) {
@@ -851,7 +864,7 @@ metadata:
   namespace: openshift-cluster-storage-operator
 spec:
   serviceName: "csi-snapshot-webhook"
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: csi-snapshot-webhook
@@ -899,7 +912,19 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: "NoSchedule"
-
+      # Try to place each pod on a different node.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - csi-snapshot-webhook
+              topologyKey: kubernetes.io/hostname
 `)
 
 func webhook_deploymentYamlBytes() ([]byte, error) {

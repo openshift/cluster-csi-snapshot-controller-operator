@@ -214,8 +214,8 @@ func getDeployment(args []string, image string, modifiers ...deploymentModifier)
 	dep := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deploymentAsset))
 	dep.Spec.Template.Spec.Containers[0].Args = args
 	dep.Spec.Template.Spec.Containers[0].Image = image
-	var one int32 = 1
-	dep.Spec.Replicas = &one
+	var two int32 = 2
+	dep.Spec.Replicas = &two
 
 	for _, modifier := range modifiers {
 		dep = modifier(dep)
@@ -316,7 +316,7 @@ func addGenerationReactor(client *fakecore.Clientset) {
 }
 
 func TestSync(t *testing.T) {
-	const replica1 = 1
+	const replica2 = 2
 	const defaultImage = "csi-snahpshot-webhook-image"
 	var argsLevel2 = []string{"--tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt", "--tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key", "--v=2", "--port=8443"}
 	var argsLevel6 = []string{"--tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt", "--tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key", "--v=6", "--port=8443"}
@@ -343,11 +343,11 @@ func TestSync(t *testing.T) {
 			name:  "deployment fully deployed",
 			image: defaultImage,
 			initialObjects: testObjects{
-				deployment:            getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
+				deployment:            getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica2, replica2, replica2)),
 				csiSnapshotController: csiSnapshotController(withGenerations(1, 1)),
 			},
 			expectedObjects: testObjects{
-				deployment:    getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
+				deployment:    getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica2, replica2, replica2)),
 				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
 					withGenerations(1, 1),
@@ -361,17 +361,17 @@ func TestSync(t *testing.T) {
 			image: defaultImage,
 			initialObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage,
-					withDeploymentReplicas(2),      // User changed replicas
+					withDeploymentReplicas(3),      // User changed replicas
 					withDeploymentGeneration(2, 1), // ... which changed Generation
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				webhookConfig:         validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(withGenerations(1, 1)), // the operator knows the old generation of the Deployment
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage,
-					withDeploymentReplicas(1),      // The operator fixed replica count
+					withDeploymentReplicas(2),      // The operator fixed replica count
 					withDeploymentGeneration(3, 1), // ... which bumps generation again
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
 					withGenerations(3, 1), // now the operator knows generation 1
@@ -440,7 +440,7 @@ func TestSync(t *testing.T) {
 			initialObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
 					withGenerations(1, 1),
@@ -450,7 +450,7 @@ func TestSync(t *testing.T) {
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel6, defaultImage, // The operator changed cmdline arguments with a new log level
 					withDeploymentGeneration(2, 1), // ... which caused the Generation to increase
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				webhookConfig: validatingWebhookConfiguration(1),
 				csiSnapshotController: csiSnapshotController(
 					withLogLevel(opv1.Trace),
@@ -466,17 +466,15 @@ func TestSync(t *testing.T) {
 			image: defaultImage,
 			initialObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage,
-					withDeploymentReplicas(1),
 					withDeploymentGeneration(1, 1),
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				webhookConfig:         validatingWebhookConfiguration(2, withWebhookPort(8080)), // Use changed the port, which changed the generation
 				csiSnapshotController: csiSnapshotController(withGenerations(1, 1)),             // the operator knows the old generation of the webhook
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage,
-					withDeploymentReplicas(1),
 					withDeploymentGeneration(1, 1),
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				webhookConfig: validatingWebhookConfiguration(3), // the webhook port was fixed + generation bumped
 				csiSnapshotController: csiSnapshotController(
 					withGenerations(1, 3),

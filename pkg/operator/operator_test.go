@@ -252,8 +252,8 @@ func getDeployment(args []string, image string, modifiers ...deploymentModifier)
 	dep := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
 	dep.Spec.Template.Spec.Containers[0].Args = args
 	dep.Spec.Template.Spec.Containers[0].Image = image
-	var one int32 = 1
-	dep.Spec.Replicas = &one
+	var two int32 = 2
+	dep.Spec.Replicas = &two
 
 	// Set by ApplyDeployment()
 	if dep.Annotations == nil {
@@ -481,14 +481,14 @@ func TestSync(t *testing.T) {
 			image: defaultImage,
 			initialObjects: testObjects{
 				crds:                  getCRDs(withEstablishedConditions),
-				deployment:            getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
+				deployment:            getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica2, replica2, replica2)),
 				csiSnapshotController: csiSnapshotController(withGenerations(1)),
 			},
 			expectedObjects: testObjects{
 				crds:       getCRDs(withEstablishedConditions),
-				deployment: getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
+				deployment: getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica2, replica2, replica2)),
 				csiSnapshotController: csiSnapshotController(
-					withStatus(replica1),
+					withStatus(replica2),
 					withGenerations(1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
 					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
@@ -501,19 +501,19 @@ func TestSync(t *testing.T) {
 			initialObjects: testObjects{
 				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
-					withDeploymentReplicas(2),      // User changed replicas
+					withDeploymentReplicas(3),      // User changed replicas
 					withDeploymentGeneration(2, 1), // ... which changed Generation
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				csiSnapshotController: csiSnapshotController(withGenerations(1)), // the operator knows the old generation of the Deployment
 			},
 			expectedObjects: testObjects{
 				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
-					withDeploymentReplicas(1),      // The operator fixed replica count
+					withDeploymentReplicas(2),      // The operator fixed replica count
 					withDeploymentGeneration(3, 1), // ... which bumps generation again
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				csiSnapshotController: csiSnapshotController(
-					withStatus(replica1),
+					withStatus(replica2),
 					withGenerations(3), // now the operator knows generation 1
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // Progressing due to Generation change
 					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
@@ -529,7 +529,7 @@ func TestSync(t *testing.T) {
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // the Deployment has no pods
 				csiSnapshotController: csiSnapshotController(
-					withStatus(replica1),
+					withStatus(replica2),
 					withGenerations(1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
@@ -558,7 +558,7 @@ func TestSync(t *testing.T) {
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1 /*ready*/, 1 /*available*/, 0 /*updated*/)), // the Deployment is updating 1 pod
 				csiSnapshotController: csiSnapshotController(
-					withStatus(replica1),
+					withStatus(replica2),
 					withGenerations(1),
 					withGeneration(1, 1),
 					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
@@ -585,7 +585,7 @@ func TestSync(t *testing.T) {
 				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				csiSnapshotController: csiSnapshotController(
 					withGenerations(1),
 					withLogLevel(opv1.Trace), // User changed the log level...
@@ -595,9 +595,9 @@ func TestSync(t *testing.T) {
 				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel6, defaultImage, // The operator changed cmdline arguments with a new log level
 					withDeploymentGeneration(2, 1), // ... which caused the Generation to increase
-					withDeploymentStatus(replica1, replica1, replica1)),
+					withDeploymentStatus(replica2, replica2, replica2)),
 				csiSnapshotController: csiSnapshotController(
-					withStatus(replica1),
+					withStatus(replica2),
 					withLogLevel(opv1.Trace),
 					withGenerations(2),
 					withGeneration(2, 2),
