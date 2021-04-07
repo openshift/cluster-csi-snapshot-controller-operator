@@ -19,6 +19,8 @@ spec:
   template:
     metadata:
       name: csi-snapshot-controller-operator
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: csi-snapshot-controller-operator
     spec:
