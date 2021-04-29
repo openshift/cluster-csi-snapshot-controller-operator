@@ -72,6 +72,8 @@ spec:
       app: csi-snapshot-controller
   template:
     metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: csi-snapshot-controller
     spec:
@@ -857,6 +859,8 @@ spec:
       app: csi-snapshot-webhook
   template:
     metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: csi-snapshot-webhook
     spec:
