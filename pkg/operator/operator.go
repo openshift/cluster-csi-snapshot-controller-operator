@@ -15,7 +15,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
+	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/workqueue"
@@ -57,6 +59,7 @@ type csiSnapshotOperator struct {
 
 	syncHandler func() error
 
+	nodeLister      corelistersv1.NodeLister
 	crdLister       apiextlistersv1.CustomResourceDefinitionLister
 	crdListerSynced cache.InformerSynced
 	crdClient       apiextclient.Interface
@@ -72,6 +75,7 @@ type csiSnapshotOperator struct {
 
 func NewCSISnapshotControllerOperator(
 	client operatorclient.OperatorClient,
+	nodeInformer coreinformersv1.NodeInformer,
 	crdInformer apiextinformersv1.CustomResourceDefinitionInformer,
 	crdClient apiextclient.Interface,
 	deployInformer appsinformersv1.DeploymentInformer,
@@ -84,6 +88,7 @@ func NewCSISnapshotControllerOperator(
 ) *csiSnapshotOperator {
 	csiOperator := &csiSnapshotOperator{
 		client:                     client,
+		nodeLister:                 nodeInformer.Lister(),
 		crdClient:                  crdClient,
 		kubeClient:                 kubeClient,
 		versionGetter:              versionGetter,
@@ -94,6 +99,7 @@ func NewCSISnapshotControllerOperator(
 		csiSnapshotControllerImage: csiSnapshotControllerImage,
 	}
 
+	nodeInformer.Informer().AddEventHandler(csiOperator.eventHandler("node"))
 	crdInformer.Informer().AddEventHandler(csiOperator.eventHandler("crd"))
 	deployInformer.Informer().AddEventHandler(csiOperator.eventHandler("deployment"))
 	client.Informer().AddEventHandler(csiOperator.eventHandler("csisnapshotcontroller"))

@@ -66,10 +66,14 @@ metadata:
   namespace: openshift-cluster-storage-operator
 spec:
   serviceName: "csi-snapshot-controller"
-  replicas: 1
   selector:
     matchLabels:
       app: csi-snapshot-controller
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
   template:
     metadata:
       annotations:
@@ -90,6 +94,15 @@ spec:
               # TODO: measure on a real cluster
               cpu: 10m
               memory: 50Mi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: csi-snapshot-controller
+                topologyKey: kubernetes.io/hostname
       priorityClassName: "system-cluster-critical"
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -853,10 +866,14 @@ metadata:
   namespace: openshift-cluster-storage-operator
 spec:
   serviceName: "csi-snapshot-webhook"
-  replicas: 1
   selector:
     matchLabels:
       app: csi-snapshot-webhook
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
   template:
     metadata:
       annotations:
@@ -883,6 +900,15 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: csi-snapshot-webhook
+                topologyKey: kubernetes.io/hostname
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
       nodeSelector:
@@ -903,7 +929,6 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: "NoSchedule"
-
 `)
 
 func webhook_deploymentYamlBytes() ([]byte, error) {

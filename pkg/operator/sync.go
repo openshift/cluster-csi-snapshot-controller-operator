@@ -8,6 +8,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -108,9 +109,12 @@ func (c *csiSnapshotOperator) checkAlphaCRDs() error {
 }
 
 func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotController) (*appsv1.Deployment, error) {
-	deploy := c.getExpectedDeployment(instance)
+	deploy, err := c.getExpectedDeployment(instance)
+	if err != nil {
+		return nil, err
+	}
 
-	deploy, _, err := resourceapply.ApplyDeployment(
+	deploy, _, err = resourceapply.ApplyDeployment(
 		c.kubeClient.AppsV1(),
 		c.eventRecorder,
 		deploy,
@@ -121,7 +125,7 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 	return deploy, nil
 }
 
-func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnapshotController) *appsv1.Deployment {
+func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnapshotController) (*appsv1.Deployment, error) {
 	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
 	deployment.Spec.Template.Spec.Containers[0].Image = c.csiSnapshotControllerImage
 
@@ -132,7 +136,22 @@ func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnap
 		}
 	}
 
-	return deployment
+	nodeSelector := deployment.Spec.Template.Spec.NodeSelector
+	nodes, err := c.nodeLister.List(labels.SelectorFromSet(nodeSelector))
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the deployment.Spec.Replicas field according to the number
+	// of available nodes. If the number of available nodes is bigger
+	// than 1, then the number of replicas will be 2.
+	replicas := int32(1)
+	if len(nodes) > 1 {
+		replicas = int32(2)
+	}
+	deployment.Spec.Replicas = &replicas
+
+	return deployment, nil
 }
 
 func getLogLevel(logLevel operatorv1.LogLevel) int {

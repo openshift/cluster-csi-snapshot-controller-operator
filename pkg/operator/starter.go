@@ -67,6 +67,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	operator := NewCSISnapshotControllerOperator(
 		*operatorClient,
+		ctrlctx.KubeNamespacedInformerFactory.Core().V1().Nodes(),
 		ctrlctx.APIExtInformerFactory.Apiextensions().V1().CustomResourceDefinitions(),
 		ctrlctx.ClientBuilder.APIExtClientOrDie(targetName),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
@@ -78,7 +79,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		os.Getenv(operandImageEnvName),
 	)
 
-	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(*operatorClient,
+	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(
+		*operatorClient,
+		ctrlctx.KubeNamespacedInformerFactory.Core().V1().Nodes(),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		ctrlctx.KubeNamespacedInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations(),
 		kubeClient,
@@ -111,6 +114,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}{
 		csiConfigInformers,
 		configInformers,
+		kubeInformersForNamespaces,
 		ctrlctx.APIExtInformerFactory,         // CRDs
 		ctrlctx.KubeNamespacedInformerFactory, // operand Deployment
 	} {

@@ -2,6 +2,7 @@ package webhookdeployment
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"testing"
 
@@ -17,7 +18,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,6 +44,7 @@ type testContext struct {
 }
 
 type testObjects struct {
+	nodes                 []*v1.Node
 	deployment            *appsv1.Deployment
 	webhookConfig         *admissionv1.ValidatingWebhookConfiguration
 	csiSnapshotController *opv1.CSISnapshotController
@@ -54,9 +56,17 @@ const (
 	webhookName         = "snapshot.storage.k8s.io"
 )
 
+var masterNodeLabels = map[string]string{"node-role.kubernetes.io/master": ""}
+
 func newOperator(test operatorTest) *testContext {
 	// Convert to []runtime.Object
 	var initialObjects []runtime.Object
+	if len(test.initialObjects.nodes) == 0 {
+		test.initialObjects.nodes = []*v1.Node{makeNode("A", masterNodeLabels)}
+	}
+	for _, node := range test.initialObjects.nodes {
+		initialObjects = append(initialObjects, node)
+	}
 	if test.initialObjects.deployment != nil {
 		initialObjects = append(initialObjects, test.initialObjects.deployment)
 	}
@@ -66,6 +76,9 @@ func newOperator(test operatorTest) *testContext {
 	coreClient := fakecore.NewSimpleClientset(initialObjects...)
 	coreInformerFactory := coreinformers.NewSharedInformerFactory(coreClient, 0 /*no resync */)
 	// Fill the informer
+	for _, node := range test.initialObjects.nodes {
+		coreInformerFactory.Core().V1().Nodes().Informer().GetIndexer().Add(node)
+	}
 	if test.initialObjects.deployment != nil {
 		coreInformerFactory.Apps().V1().Deployments().Informer().GetIndexer().Add(test.initialObjects.deployment)
 	}
@@ -96,6 +109,7 @@ func newOperator(test operatorTest) *testContext {
 	recorder := events.NewInMemoryRecorder("operator")
 	ctrl := NewCSISnapshotWebhookController(
 		client,
+		coreInformerFactory.Core().V1().Nodes(),
 		coreInformerFactory.Apps().V1().Deployments(),
 		coreInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations(),
 		coreClient,
@@ -484,6 +498,34 @@ func TestSync(t *testing.T) {
 					withFalseConditions(opv1.OperatorStatusTypeProgressing)),
 			},
 		},
+		{
+			// Deployment replicas is adjusted according to number of node selector
+			name:  "number of replicas is set accordingly",
+			image: defaultImage,
+			initialObjects: testObjects{
+				nodes: []*v1.Node{ // 3 master nodes
+					makeNode("A", masterNodeLabels),
+					makeNode("B", masterNodeLabels),
+					makeNode("C", masterNodeLabels),
+				},
+				deployment: getDeployment(argsLevel2, defaultImage,
+					withDeploymentReplicas(1), // just 1 replica
+					withDeploymentGeneration(1, 1),
+					withDeploymentStatus(replica1, replica1, replica1)),
+				webhookConfig: validatingWebhookConfiguration(1),
+				csiSnapshotController: csiSnapshotController(
+					withGenerations(1, 1),
+					withGeneration(1, 1),
+					withTrueConditions(opv1.OperatorStatusTypeAvailable),
+					withFalseConditions(opv1.OperatorStatusTypeProgressing)),
+			},
+			expectedObjects: testObjects{
+				deployment: getDeployment(argsLevel2, defaultImage,
+					withDeploymentReplicas(2),      // the operator changed the number of replicas to 2
+					withDeploymentGeneration(2, 1), // which bumped the generation
+					withDeploymentStatus(replica1, replica1, replica1)),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -492,7 +534,7 @@ func TestSync(t *testing.T) {
 			ctx := newOperator(test)
 
 			// Act
-			syncContext := factory.NewSyncContext("test", events.NewRecorder(ctx.coreClient.CoreV1().Events("test"), "test-operator", &corev1.ObjectReference{}))
+			syncContext := factory.NewSyncContext("test", events.NewRecorder(ctx.coreClient.CoreV1().Events("test"), "test-operator", &v1.ObjectReference{}))
 			err := ctx.webhookController.Sync(context.TODO(), syncContext)
 
 			// Assert
@@ -588,4 +630,13 @@ func sanitizeCSISnapshotController(instance *opv1.CSISnapshotController) {
 	sort.Slice(instance.Status.Conditions, func(i, j int) bool {
 		return instance.Status.Conditions[i].Type < instance.Status.Conditions[j].Type
 	})
+}
+
+func makeNode(suffix string, labels map[string]string) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   fmt.Sprintf("node-%s", suffix),
+			Labels: labels,
+		},
+	}
 }
