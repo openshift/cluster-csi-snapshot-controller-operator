@@ -259,12 +259,12 @@ func getDeployment(args []string, image string, modifiers ...deploymentModifier)
 	if dep.Annotations == nil {
 		dep.Annotations = map[string]string{}
 	}
-	resourceapply.SetSpecHashAnnotation(&dep.ObjectMeta, dep.Spec)
 
 	for _, modifier := range modifiers {
 		dep = modifier(dep)
 	}
 
+	resourceapply.SetSpecHashAnnotation(&dep.ObjectMeta, dep.Spec)
 	return dep
 }
 
