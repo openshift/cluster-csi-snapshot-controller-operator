@@ -13,11 +13,14 @@ import (
 	csisnapshotconfigclient "github.com/openshift/client-go/operator/clientset/versioned"
 	informer "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operator/webhookdeployment"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/status"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,6 +67,18 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	kubeClient := ctrlctx.ClientBuilder.KubeClientOrDie(targetName)
 
 	versionGetter := status.NewVersionGetter()
+
+	staticResourcesController := staticresourcecontroller.NewStaticResourceController(
+		"CSISnapshotStaticResourceController",
+		generated.Asset,
+		[]string{
+			"csi_controller_deployment_pdb.yaml",
+			"webhook_deployment_pdb.yaml",
+		},
+		(&resourceapply.ClientHolder{}).WithKubernetes(kubeClient),
+		operatorClient,
+		controllerConfig.EventRecorder,
+	).AddKubeInformers(ctrlctx.KubeNamespacedInformerFactory)
 
 	operator := NewCSISnapshotControllerOperator(
 		*operatorClient,
@@ -128,6 +143,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		clusterOperatorStatus,
 		logLevelController,
 		managementStateController,
+		staticResourcesController,
 		webhookOperator,
 	} {
 		go controller.Run(ctx, 1)
