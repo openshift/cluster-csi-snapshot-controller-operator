@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/status"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -68,6 +69,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	versionGetter := status.NewVersionGetter()
 
+	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, operatorNamespace, targetNamespace)
 	staticResourcesController := staticresourcecontroller.NewStaticResourceController(
 		"CSISnapshotStaticResourceController",
 		generated.Asset,
@@ -78,7 +80,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		(&resourceapply.ClientHolder{}).WithKubernetes(kubeClient),
 		operatorClient,
 		controllerConfig.EventRecorder,
-	).AddKubeInformers(ctrlctx.KubeNamespacedInformerFactory)
+	).AddKubeInformers(kubeInformersForNamespaces)
 
 	operator := NewCSISnapshotControllerOperator(
 		*operatorClient,
