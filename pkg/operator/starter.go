@@ -13,12 +13,16 @@ import (
 	csisnapshotconfigclient "github.com/openshift/client-go/operator/clientset/versioned"
 	informer "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operator/webhookdeployment"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/status"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -65,8 +69,22 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	versionGetter := status.NewVersionGetter()
 
+	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, operatorNamespace, targetNamespace)
+	staticResourcesController := staticresourcecontroller.NewStaticResourceController(
+		"CSISnapshotStaticResourceController",
+		generated.Asset,
+		[]string{
+			"csi_controller_deployment_pdb.yaml",
+			"webhook_deployment_pdb.yaml",
+		},
+		(&resourceapply.ClientHolder{}).WithKubernetes(kubeClient),
+		operatorClient,
+		controllerConfig.EventRecorder,
+	).AddKubeInformers(kubeInformersForNamespaces)
+
 	operator := NewCSISnapshotControllerOperator(
 		*operatorClient,
+		ctrlctx.KubeNamespacedInformerFactory.Core().V1().Nodes(),
 		ctrlctx.APIExtInformerFactory.Apiextensions().V1().CustomResourceDefinitions(),
 		ctrlctx.ClientBuilder.APIExtClientOrDie(targetName),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
@@ -78,7 +96,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		os.Getenv(operandImageEnvName),
 	)
 
-	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(*operatorClient,
+	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(
+		*operatorClient,
+		ctrlctx.KubeNamespacedInformerFactory.Core().V1().Nodes(),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		ctrlctx.KubeNamespacedInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations(),
 		kubeClient,
@@ -111,6 +131,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}{
 		csiConfigInformers,
 		configInformers,
+		kubeInformersForNamespaces,
 		ctrlctx.APIExtInformerFactory,         // CRDs
 		ctrlctx.KubeNamespacedInformerFactory, // operand Deployment
 	} {
@@ -124,6 +145,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		clusterOperatorStatus,
 		logLevelController,
 		managementStateController,
+		staticResourcesController,
 		webhookOperator,
 	} {
 		go controller.Run(ctx, 1)

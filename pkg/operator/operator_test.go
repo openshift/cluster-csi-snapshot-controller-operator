@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -16,7 +17,9 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/status"
+
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	fakeextapi "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	apiextinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
@@ -48,6 +51,7 @@ type testContext struct {
 }
 
 type testObjects struct {
+	nodes                 []*v1.Node
 	deployment            *appsv1.Deployment
 	crds                  []*apiextv1.CustomResourceDefinition
 	csiSnapshotController *opv1.CSISnapshotController
@@ -65,14 +69,25 @@ type testReactors struct {
 
 const testVersion = "0.0.1" // Version of the operator for testing purposes (instead of getenv)
 
+var masterNodeLabels = map[string]string{"node-role.kubernetes.io/master": ""}
+
 func newOperator(test operatorTest) *testContext {
 	// Convert to []runtime.Object
-	var initialDeployments []runtime.Object
-	if test.initialObjects.deployment != nil {
-		initialDeployments = []runtime.Object{test.initialObjects.deployment}
+	var initialObjects []runtime.Object
+	if len(test.initialObjects.nodes) == 0 {
+		test.initialObjects.nodes = []*v1.Node{makeNode("A", masterNodeLabels)}
 	}
-	coreClient := fakecore.NewSimpleClientset(initialDeployments...)
+	for _, node := range test.initialObjects.nodes {
+		initialObjects = append(initialObjects, node)
+	}
+	if test.initialObjects.deployment != nil {
+		initialObjects = append(initialObjects, test.initialObjects.deployment)
+	}
+	coreClient := fakecore.NewSimpleClientset(initialObjects...)
 	coreInformerFactory := coreinformers.NewSharedInformerFactory(coreClient, 0 /*no resync */)
+	for _, node := range test.initialObjects.nodes {
+		coreInformerFactory.Core().V1().Nodes().Informer().GetIndexer().Add(node)
+	}
 	// Fill the informer
 	if test.initialObjects.deployment != nil {
 		coreInformerFactory.Apps().V1().Deployments().Informer().GetIndexer().Add(test.initialObjects.deployment)
@@ -125,6 +140,7 @@ func newOperator(test operatorTest) *testContext {
 
 	recorder := events.NewInMemoryRecorder("operator")
 	op := NewCSISnapshotControllerOperator(client,
+		coreInformerFactory.Core().V1().Nodes(),
 		extAPIInformerFactory.Apiextensions().V1().CustomResourceDefinitions(),
 		extAPIClient,
 		coreInformerFactory.Apps().V1().Deployments(),
@@ -259,12 +275,12 @@ func getDeployment(args []string, image string, modifiers ...deploymentModifier)
 	if dep.Annotations == nil {
 		dep.Annotations = map[string]string{}
 	}
-	resourceapply.SetSpecHashAnnotation(&dep.ObjectMeta, dep.Spec)
 
 	for _, modifier := range modifiers {
 		dep = modifier(dep)
 	}
 
+	resourceapply.SetSpecHashAnnotation(&dep.ObjectMeta, dep.Spec)
 	return dep
 }
 
@@ -670,7 +686,31 @@ func TestSync(t *testing.T) {
 				crds: addCRDEstablishedRector,
 			},
 		},
-
+		{
+			// Deployment replicas is adjusted according to number of node selector
+			name:  "number of replicas is set accordingly",
+			image: defaultImage,
+			initialObjects: testObjects{
+				nodes: []*v1.Node{ // 3 master nodes
+					makeNode("A", masterNodeLabels),
+					makeNode("B", masterNodeLabels),
+					makeNode("C", masterNodeLabels),
+				},
+				crds: getCRDs(withEstablishedConditions),
+				deployment: getDeployment(argsLevel2, defaultImage,
+					withDeploymentReplicas(1), // just 1 replica
+					withDeploymentGeneration(1, 1),
+					withDeploymentStatus(replica1, replica1, replica1)),
+				csiSnapshotController: csiSnapshotController(withGenerations(1)),
+			},
+			expectedObjects: testObjects{
+				crds: getCRDs(withEstablishedConditions),
+				deployment: getDeployment(argsLevel2, defaultImage,
+					withDeploymentReplicas(2),      // The operator fixed replica count
+					withDeploymentGeneration(2, 1), // ... which bumps generation again
+					withDeploymentStatus(replica1, replica1, replica1)),
+			},
+		},
 		// TODO: more error cases? Deployment creation fails and things like that?
 	}
 
@@ -729,7 +769,8 @@ func TestSync(t *testing.T) {
 				sanitizeDeployment(actualDeployment)
 				sanitizeDeployment(test.expectedObjects.deployment)
 				if !equality.Semantic.DeepEqual(test.expectedObjects.deployment, actualDeployment) {
-					t.Errorf("Unexpected Deployment %+v content:\n%s", targetName, cmp.Diff(test.expectedObjects.deployment, actualDeployment))
+					// fmt.Printf("1 -> %+v\n", test.expectedObjects.deployment.Annotations)
+					t.Fatalf("Unexpected Deployment %+v content:\n%s", targetName, cmp.Diff(test.expectedObjects.deployment, actualDeployment))
 				}
 			}
 			// Check expectedObjects.csiSnapshotController
@@ -773,4 +814,13 @@ func sanitizeCSISnapshotController(instance *opv1.CSISnapshotController) {
 	sort.Slice(instance.Status.Conditions, func(i, j int) bool {
 		return instance.Status.Conditions[i].Type < instance.Status.Conditions[j].Type
 	})
+}
+
+func makeNode(suffix string, labels map[string]string) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   fmt.Sprintf("node-%s", suffix),
+			Labels: labels,
+		},
+	}
 }

@@ -19,17 +19,21 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	admissionnformersv1 "k8s.io/client-go/informers/admissionregistration/v1"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
+	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/workqueue"
 )
 
 type csiSnapshotWebhookController struct {
 	client        operatorclient.OperatorClient
 	kubeClient    kubernetes.Interface
+	nodeLister    corelistersv1.NodeLister
 	eventRecorder events.Recorder
 
 	queue workqueue.RateLimitingInterface
@@ -59,6 +63,7 @@ func init() {
 // NewCSISnapshotWebhookController returns a controller that creates and manages Deployment with CSI snapshot webhook.
 func NewCSISnapshotWebhookController(
 	client operatorclient.OperatorClient,
+	nodeInformer coreinformersv1.NodeInformer,
 	deployInformer appsinformersv1.DeploymentInformer,
 	webhookInformer admissionnformersv1.ValidatingWebhookConfigurationInformer,
 	kubeClient kubernetes.Interface,
@@ -68,6 +73,7 @@ func NewCSISnapshotWebhookController(
 	c := &csiSnapshotWebhookController{
 		client:                  client,
 		kubeClient:              kubeClient,
+		nodeLister:              nodeInformer.Lister(),
 		eventRecorder:           eventRecorder,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
 		csiSnapshotWebhookImage: csiSnapshotWebhookImage,
@@ -75,6 +81,7 @@ func NewCSISnapshotWebhookController(
 
 	return factory.New().WithSync(c.sync).WithSyncDegradedOnError(client).WithInformers(
 		client.Informer(),
+		nodeInformer.Informer(),
 		deployInformer.Informer(),
 		webhookInformer.Informer(),
 	).ToController(WebhookControllerName, eventRecorder.WithComponentSuffix(WebhookControllerName))
@@ -97,6 +104,24 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 		// This will set Degraded condition
 		return err
 	}
+
+	// Set the number of replicas according to the number of nodes available
+	nodeSelector := deployment.Spec.Template.Spec.NodeSelector
+	nodes, err := c.nodeLister.List(labels.SelectorFromSet(nodeSelector))
+	if err != nil {
+		// This will set Degraded condition
+		return err
+	}
+
+	// Set the deployment.Spec.Replicas field according to the number
+	// of available nodes. If the number of available nodes is bigger
+	// than 1, then the number of replicas will be 2.
+	replicas := int32(1)
+	if len(nodes) > 1 {
+		replicas = int32(2)
+	}
+	deployment.Spec.Replicas = &replicas
+
 	lastGeneration := resourcemerge.ExpectedDeploymentGeneration(deployment, opStatus.Generations)
 	deployment, _, err = resourceapply.ApplyDeployment(c.kubeClient.AppsV1(), syncCtx.Recorder(), deployment, lastGeneration)
 	if err != nil {
