@@ -12,8 +12,8 @@ import (
 	configinformer "github.com/openshift/client-go/config/informers/externalversions"
 	csisnapshotconfigclient "github.com/openshift/client-go/operator/clientset/versioned"
 	informer "github.com/openshift/client-go/operator/informers/externalversions"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
-	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operator/webhookdeployment"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -72,7 +72,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, operatorNamespace, targetNamespace)
 	staticResourcesController := staticresourcecontroller.NewStaticResourceController(
 		"CSISnapshotStaticResourceController",
-		generated.Asset,
+		assets.ReadFile,
 		[]string{
 			"csi_controller_deployment_pdb.yaml",
 			"webhook_deployment_pdb.yaml",

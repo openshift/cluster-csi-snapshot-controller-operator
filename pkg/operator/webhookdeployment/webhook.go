@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	operatorapi "github.com/openshift/api/operator/v1"
-	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -189,7 +189,11 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 }
 
 func (c *csiSnapshotWebhookController) getDeployment(opSpec *operatorapi.OperatorSpec) (*appsv1.Deployment, error) {
-	deploymentString := string(generated.MustAsset(deploymentAsset))
+	deploymentBytes, err := assets.ReadFile(deploymentAsset)
+	if err != nil {
+		return nil, err
+	}
+	deploymentString := string(deploymentBytes)
 
 	// Replace image
 	deploymentString = strings.ReplaceAll(deploymentString, "${WEBHOOK_IMAGE}", c.csiSnapshotWebhookImage)
@@ -206,7 +210,10 @@ func (c *csiSnapshotWebhookController) getDeployment(opSpec *operatorapi.Operato
 }
 
 func getWebhookConfig() (*admissionv1.ValidatingWebhookConfiguration, error) {
-	webhookBytes := generated.MustAsset(webhookAsset)
+	webhookBytes, err := assets.ReadFile(webhookAsset)
+	if err != nil {
+		return nil, err
+	}
 	requiredObj, err := runtime.Decode(admissionCodecs.UniversalDecoder(admissionv1.SchemeGroupVersion), webhookBytes)
 	if err != nil {
 		return nil, err
