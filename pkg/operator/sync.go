@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	appsv1 "k8s.io/api/apps/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -12,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
-	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
@@ -44,7 +44,11 @@ func (c *csiSnapshotOperator) syncCustomResourceDefinitions() error {
 		return err
 	}
 	for _, file := range crds {
-		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(generated.MustAsset(file))
+		crdBytes, err := assets.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(crdBytes)
 		_, updated, err := resourceapply.ApplyCustomResourceDefinitionV1(c.crdClient.ApiextensionsV1(), c.eventRecorder, crd)
 		if err != nil {
 			return err
@@ -88,7 +92,11 @@ func (c *csiSnapshotOperator) waitForCustomResourceDefinition(resource *apiextv1
 func (c *csiSnapshotOperator) checkAlphaCRDs() error {
 	var alphas []string
 	for _, file := range crds {
-		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(generated.MustAsset(file))
+		crdBytes, err := assets.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(crdBytes)
 		oldCRD, err := c.crdLister.Get(crd.Name)
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -126,7 +134,11 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 }
 
 func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnapshotController) (*appsv1.Deployment, error) {
-	deployment := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
+	deploymentBytes, err := assets.ReadFile(deployment)
+	if err != nil {
+		return nil, err
+	}
+	deployment := resourceread.ReadDeploymentV1OrDie(deploymentBytes)
 	deployment.Spec.Template.Spec.Containers[0].Image = c.csiSnapshotControllerImage
 
 	logLevel := getLogLevel(instance.Spec.LogLevel)

@@ -11,7 +11,7 @@ import (
 	opv1 "github.com/openshift/api/operator/v1"
 	fakeop "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	opinformers "github.com/openshift/client-go/operator/informers/externalversions"
-	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -265,7 +265,11 @@ func withFalseConditions(conditions ...string) csiSnapshotControllerModifier {
 type deploymentModifier func(*appsv1.Deployment) *appsv1.Deployment
 
 func getDeployment(args []string, image string, modifiers ...deploymentModifier) *appsv1.Deployment {
-	dep := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deployment))
+	depBytes, err := assets.ReadFile(deployment)
+	if err != nil {
+		panic(err)
+	}
+	dep := resourceread.ReadDeploymentV1OrDie(depBytes)
 	dep.Spec.Template.Spec.Containers[0].Args = args
 	dep.Spec.Template.Spec.Containers[0].Image = image
 	var one int32 = 1
@@ -317,7 +321,11 @@ type crdModifier func(*apiextv1.CustomResourceDefinition) *apiextv1.CustomResour
 func getCRDs(modifiers ...crdModifier) []*apiextv1.CustomResourceDefinition {
 	crdObjects := make([]*apiextv1.CustomResourceDefinition, 3)
 	for i, file := range crds {
-		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(generated.MustAsset(file))
+		crdBytes, err := assets.ReadFile(file)
+		if err != nil {
+			panic(err)
+		}
+		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(crdBytes)
 		for _, modifier := range modifiers {
 			crd = modifier(crd)
 		}

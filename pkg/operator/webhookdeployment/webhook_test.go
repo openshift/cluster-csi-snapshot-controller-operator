@@ -10,7 +10,7 @@ import (
 	opv1 "github.com/openshift/api/operator/v1"
 	fakeop "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	opinformers "github.com/openshift/client-go/operator/informers/externalversions"
-	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/generated"
+	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -225,7 +225,11 @@ func withFalseConditions(conditions ...string) csiSnapshotControllerModifier {
 type deploymentModifier func(*appsv1.Deployment) *appsv1.Deployment
 
 func getDeployment(args []string, image string, modifiers ...deploymentModifier) *appsv1.Deployment {
-	dep := resourceread.ReadDeploymentV1OrDie(generated.MustAsset(deploymentAsset))
+	depBytes, err := assets.ReadFile(deploymentAsset)
+	if err != nil {
+		panic(err)
+	}
+	dep := resourceread.ReadDeploymentV1OrDie(depBytes)
 	dep.Spec.Template.Spec.Containers[0].Args = args
 	dep.Spec.Template.Spec.Containers[0].Image = image
 	var one int32 = 1
