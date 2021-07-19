@@ -8,8 +8,8 @@ require (
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.0.0
-	github.com/openshift/api v0.0.0-20210521075222-e273a339932a
-	github.com/openshift/build-machinery-go v0.0.0-20210423112049-9415d7ebd33e
+	github.com/openshift/api v0.0.0-20210719174558-55d730c80aa9
+	github.com/openshift/build-machinery-go v0.0.0-20210712174854-1bb7fd1518d3
 	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142
 	github.com/openshift/library-go v0.0.0-20210531122633-91d29fb786be
 	github.com/prometheus/client_golang v1.7.1
