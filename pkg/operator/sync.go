@@ -12,11 +12,16 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+)
+
+const (
+	infraConfigName = "cluster"
 )
 
 var crds = [...]string{"volumesnapshots.yaml",
@@ -141,11 +146,22 @@ func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnap
 	deployment := resourceread.ReadDeploymentV1OrDie(deploymentBytes)
 	deployment.Spec.Template.Spec.Containers[0].Image = c.csiSnapshotControllerImage
 
+	infra, err := c.infraLister.Get(infraConfigName)
+	if err != nil {
+		return nil, err
+	}
+
 	logLevel := getLogLevel(instance.Spec.LogLevel)
 	for i, arg := range deployment.Spec.Template.Spec.Containers[0].Args {
 		if strings.HasPrefix(arg, "--v=") {
 			deployment.Spec.Template.Spec.Containers[0].Args[i] = fmt.Sprintf("--v=%d", logLevel)
 		}
+	}
+
+	// If the topology mode is external, there are no master nodes. Update the
+	// node selector to remove the master node selector.
+	if infra.Status.ControlPlaneTopology == configv1.ExternalTopologyMode {
+		deployment.Spec.Template.Spec.NodeSelector = map[string]string{}
 	}
 
 	nodeSelector := deployment.Spec.Template.Spec.NodeSelector

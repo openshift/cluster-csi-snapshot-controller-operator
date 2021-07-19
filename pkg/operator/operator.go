@@ -6,6 +6,7 @@ import (
 	"time"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
+	configlisterv1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	corev1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -59,6 +60,7 @@ type csiSnapshotOperator struct {
 
 	syncHandler func() error
 
+	infraLister     configlisterv1.InfrastructureLister
 	nodeLister      corelistersv1.NodeLister
 	crdLister       apiextlistersv1.CustomResourceDefinitionLister
 	crdListerSynced cache.InformerSynced
@@ -79,6 +81,7 @@ func NewCSISnapshotControllerOperator(
 	crdInformer apiextinformersv1.CustomResourceDefinitionInformer,
 	crdClient apiextclient.Interface,
 	deployInformer appsinformersv1.DeploymentInformer,
+	infraLister configlisterv1.InfrastructureLister,
 	kubeClient kubernetes.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
@@ -97,6 +100,7 @@ func NewCSISnapshotControllerOperator(
 		operatorVersion:            operatorVersion,
 		operandVersion:             operandVersion,
 		csiSnapshotControllerImage: csiSnapshotControllerImage,
+		infraLister:                infraLister,
 	}
 
 	nodeInformer.Informer().AddEventHandler(csiOperator.eventHandler("node"))
