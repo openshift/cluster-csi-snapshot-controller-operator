@@ -6,7 +6,10 @@ import (
 	"strconv"
 	"strings"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorapi "github.com/openshift/api/operator/v1"
+	configinformerv1 "github.com/openshift/client-go/config/informers/externalversions/config/v1"
+	configlisterv1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -34,6 +37,7 @@ type csiSnapshotWebhookController struct {
 	client        operatorclient.OperatorClient
 	kubeClient    kubernetes.Interface
 	nodeLister    corelistersv1.NodeLister
+	infraLister   configlisterv1.InfrastructureLister
 	eventRecorder events.Recorder
 
 	queue workqueue.RateLimitingInterface
@@ -46,6 +50,7 @@ const (
 	webhookVersionName    = "CSISnapshotWebhookDeployment"
 	deploymentAsset       = "webhook_deployment.yaml"
 	webhookAsset          = "webhook_config.yaml"
+	infraConfigName       = "cluster"
 )
 
 var (
@@ -66,6 +71,7 @@ func NewCSISnapshotWebhookController(
 	nodeInformer coreinformersv1.NodeInformer,
 	deployInformer appsinformersv1.DeploymentInformer,
 	webhookInformer admissionnformersv1.ValidatingWebhookConfigurationInformer,
+	infraInformer configinformerv1.InfrastructureInformer,
 	kubeClient kubernetes.Interface,
 	eventRecorder events.Recorder,
 	csiSnapshotWebhookImage string,
@@ -74,6 +80,7 @@ func NewCSISnapshotWebhookController(
 		client:                  client,
 		kubeClient:              kubeClient,
 		nodeLister:              nodeInformer.Lister(),
+		infraLister:             infraInformer.Lister(),
 		eventRecorder:           eventRecorder,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
 		csiSnapshotWebhookImage: csiSnapshotWebhookImage,
@@ -84,6 +91,7 @@ func NewCSISnapshotWebhookController(
 		nodeInformer.Informer(),
 		deployInformer.Informer(),
 		webhookInformer.Informer(),
+		infraInformer.Informer(),
 	).ToController(WebhookControllerName, eventRecorder.WithComponentSuffix(WebhookControllerName))
 }
 
@@ -103,6 +111,16 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 	if err != nil {
 		// This will set Degraded condition
 		return err
+	}
+
+	infra, err := c.infraLister.Get(infraConfigName)
+	if err != nil {
+		return err
+	}
+	// If the topology mode is external, there are no master nodes. Update the
+	// node selector to remove the master node selector.
+	if infra.Status.ControlPlaneTopology == configv1.ExternalTopologyMode {
+		deployment.Spec.Template.Spec.NodeSelector = map[string]string{}
 	}
 
 	// Set the number of replicas according to the number of nodes available

@@ -7,7 +7,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	configv1 "github.com/openshift/api/config/v1"
 	opv1 "github.com/openshift/api/operator/v1"
+	fakecfg "github.com/openshift/client-go/config/clientset/versioned/fake"
+	cfginformers "github.com/openshift/client-go/config/informers/externalversions"
 	fakeop "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	opinformers "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
@@ -103,6 +106,11 @@ func newOperator(test operatorTest) *testContext {
 		Informers: operatorInformerFactory,
 	}
 
+	defaultInfra := &configv1.Infrastructure{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
+	configClient := fakecfg.NewSimpleClientset(defaultInfra)
+	configInformerFactory := cfginformers.NewSharedInformerFactory(configClient, 0)
+	configInformerFactory.Config().V1().Infrastructures().Informer().GetIndexer().Add(defaultInfra)
+
 	// Add global reactors
 	addGenerationReactor(coreClient)
 
@@ -112,6 +120,7 @@ func newOperator(test operatorTest) *testContext {
 		coreInformerFactory.Core().V1().Nodes(),
 		coreInformerFactory.Apps().V1().Deployments(),
 		coreInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations(),
+		configInformerFactory.Config().V1().Infrastructures(),
 		coreClient,
 		recorder,
 		test.image,
