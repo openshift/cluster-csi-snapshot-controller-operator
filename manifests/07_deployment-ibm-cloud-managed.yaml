@@ -1,0 +1,76 @@
+# *** AUTOMATICALLY GENERATED FILE - DO NOT EDIT ***
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+  labels:
+    app: csi-snapshot-controller-operator
+  name: csi-snapshot-controller-operator
+  namespace: openshift-cluster-storage-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-snapshot-controller-operator
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: csi-snapshot-controller-operator
+      name: csi-snapshot-controller-operator
+    spec:
+      containers:
+      - args:
+        - start
+        - -v
+        - "5"
+        - --config=/var/run/configmaps/config/operator-config.yaml
+        env:
+        - name: OPERAND_IMAGE
+          value: quay.io/openshift/origin-csi-snapshot-controller
+        - name: WEBHOOK_IMAGE
+          value: registry.svc.ci.openshift.org/ocp/4.7:csi-snapshot-validation-webhook
+        - name: OPERATOR_IMAGE_VERSION
+          value: 0.0.1-snapshot
+        - name: OPERAND_IMAGE_VERSION
+          value: 0.0.1-snapshot
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        image: quay.io/openshift/origin-cluster-csi-snapshot-controller-operator:latest
+        imagePullPolicy: IfNotPresent
+        name: csi-snapshot-controller-operator
+        resources:
+          requests:
+            cpu: 10m
+            memory: 65Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /var/run/configmaps/config
+          name: config
+      priorityClassName: system-cluster-critical
+      securityContext:
+        fsGroup: 10400
+        runAsGroup: 10400
+        runAsUser: 10400
+      serviceAccountName: csi-snapshot-controller-operator
+      tolerations:
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
+        tolerationSeconds: 120
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+        tolerationSeconds: 120
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      volumes:
+      - configMap:
+          defaultMode: 440
+          name: csi-snapshot-controller-operator-config
+        name: config
