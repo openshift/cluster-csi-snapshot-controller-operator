@@ -141,7 +141,7 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 	deployment.Spec.Replicas = &replicas
 
 	lastGeneration := resourcemerge.ExpectedDeploymentGeneration(deployment, opStatus.Generations)
-	deployment, _, err = resourceapply.ApplyDeployment(c.kubeClient.AppsV1(), syncCtx.Recorder(), deployment, lastGeneration)
+	deployment, _, err = resourceapply.ApplyDeployment(ctx, c.kubeClient.AppsV1(), syncCtx.Recorder(), deployment, lastGeneration)
 	if err != nil {
 		// This will set Degraded condition
 		return err
@@ -152,7 +152,7 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 		return err
 	}
 	lastWebhookGeneration := resourcemerge.ExpectedValidatingWebhooksConfiguration(webhookConfig.Name, opStatus.Generations)
-	webhookConfig, _, err = resourceapply.ApplyValidatingWebhookConfiguration(c.kubeClient.AdmissionregistrationV1(), syncCtx.Recorder(), webhookConfig, lastWebhookGeneration)
+	webhookConfig, _, err = resourceapply.ApplyValidatingWebhookConfiguration(ctx, c.kubeClient.AdmissionregistrationV1(), syncCtx.Recorder(), webhookConfig, lastWebhookGeneration)
 	if err != nil {
 		return err
 	}
