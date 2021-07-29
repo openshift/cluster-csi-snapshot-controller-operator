@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -54,7 +55,11 @@ func (c *csiSnapshotOperator) syncCustomResourceDefinitions() error {
 			return err
 		}
 		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(crdBytes)
-		_, updated, err := resourceapply.ApplyCustomResourceDefinitionV1(c.crdClient.ApiextensionsV1(), c.eventRecorder, crd)
+		_, updated, err := resourceapply.ApplyCustomResourceDefinitionV1(
+			context.TODO(),
+			c.crdClient.ApiextensionsV1(),
+			c.eventRecorder,
+			crd)
 		if err != nil {
 			return err
 		}
@@ -128,6 +133,7 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 	}
 
 	deploy, _, err = resourceapply.ApplyDeployment(
+		context.TODO(),
 		c.kubeClient.AppsV1(),
 		c.eventRecorder,
 		deploy,

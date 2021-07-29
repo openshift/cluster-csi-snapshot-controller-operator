@@ -19,6 +19,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
+	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/status"
@@ -124,7 +125,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	logLevelController := loglevel.NewClusterOperatorLoggingController(operatorClient, controllerConfig.EventRecorder)
 	// TODO remove this controller once we support Removed
-	managementStateController := management.NewOperatorManagementStateController(targetName, operatorClient, controllerConfig.EventRecorder)
+	managementStateController := managementstatecontroller.NewOperatorManagementStateController(targetName, operatorClient, controllerConfig.EventRecorder)
 	management.SetOperatorNotRemovable()
 
 	klog.Info("Starting the Informers.")
