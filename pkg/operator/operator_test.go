@@ -481,8 +481,20 @@ func TestSync(t *testing.T) {
 	const replica1 = 1
 	const replica2 = 2
 	const defaultImage = "csi-snapshot-controller-image"
-	var argsLevel2 = []string{"--v=2", "--leader-election=true"}
-	var argsLevel6 = []string{"--v=6", "--leader-election=true"}
+	var argsLevel2 = []string{
+		"--v=2",
+		"--leader-election=true",
+		"--leader-election-lease-duration=137s",
+		"--leader-election-renew-deadline=107s",
+		"--leader-election-retry-period=26s",
+	}
+	var argsLevel6 = []string{
+		"--v=6",
+		"--leader-election=true",
+		"--leader-election-lease-duration=137s",
+		"--leader-election-renew-deadline=107s",
+		"--leader-election-retry-period=26s",
+	}
 
 	// Override default timeouts to speed up tests
 	customResourceReadyInterval = 10 * time.Millisecond
