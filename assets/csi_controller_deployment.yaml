@@ -27,6 +27,11 @@ spec:
           args:
             - "--v=5"
             - "--leader-election=true"
+            # Leader election values are from
+            # https://github.com/openshift/library-go/blob/master/pkg/config/leaderelection/leaderelection.go
+            - "--leader-election-lease-duration=137s"
+            - "--leader-election-renew-deadline=107s"
+            - "--leader-election-retry-period=26s"
           imagePullPolicy: IfNotPresent
           resources:
             requests:
