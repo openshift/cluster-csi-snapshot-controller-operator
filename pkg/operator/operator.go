@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -27,12 +28,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
-
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
-
-var log = logf.Log.WithName("csi_snapshot_controller_operator")
-var deploymentVersionHashKey = operatorv1.GroupName + "/rvs-hash"
 
 const (
 	targetName        = "csi-snapshot-controller"
@@ -45,11 +41,6 @@ const (
 	webhookImageEnvName    = "WEBHOOK_IMAGE"
 
 	maxRetries = 15
-)
-
-// static environment variables from operator deployment
-var (
-	crdNames = []string{"volumesnapshotclasses.snapshot.storage.k8s.io", "volumesnapshotcontents.snapshot.storage.k8s.io", "volumesnapshots.snapshot.storage.k8s.io"}
 )
 
 type csiSnapshotOperator struct {
@@ -162,7 +153,7 @@ func (c *csiSnapshotOperator) sync() error {
 	syncErr := c.handleSync(instanceCopy)
 	c.updateSyncError(&instanceCopy.Status.OperatorStatus, syncErr)
 
-	if _, _, err := v1helpers.UpdateStatus(c.client, func(status *operatorv1.OperatorStatus) error {
+	if _, _, err := v1helpers.UpdateStatus(context.TODO(), c.client, func(status *operatorv1.OperatorStatus) error {
 		// store a copy of our starting conditions, we need to preserve last transition time
 		originalConditions := status.DeepCopy().Conditions
 
@@ -227,7 +218,7 @@ func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotControl
 }
 
 func (c *csiSnapshotOperator) setVersion(operandName, version string) {
-	if c.versionGetter.GetVersions()[operandName] != version {
+	if c.versionChanged(operandName, version) {
 		c.versionGetter.SetVersion(operandName, version)
 	}
 }

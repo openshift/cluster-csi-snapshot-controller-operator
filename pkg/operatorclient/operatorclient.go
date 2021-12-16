@@ -42,7 +42,7 @@ func (c OperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
 	return &instance.ObjectMeta, nil
 }
 
-func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
+func (c OperatorClient) UpdateOperatorSpec(ctx context.Context, resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
 	original, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(GlobalConfigName)
 	if err != nil {
 		return nil, "", err
@@ -59,7 +59,7 @@ func (c OperatorClient) UpdateOperatorSpec(resourceVersion string, spec *operato
 	return &ret.Spec.OperatorSpec, ret.ResourceVersion, nil
 }
 
-func (c OperatorClient) UpdateOperatorStatus(resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
+func (c OperatorClient) UpdateOperatorStatus(ctx context.Context, resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
 	original, err := c.Informers.Operator().V1().CSISnapshotControllers().Lister().Get(GlobalConfigName)
 	if err != nil {
 		return nil, err

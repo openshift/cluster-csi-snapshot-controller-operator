@@ -151,8 +151,7 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 	if err != nil {
 		return err
 	}
-	lastWebhookGeneration := resourcemerge.ExpectedValidatingWebhooksConfiguration(webhookConfig.Name, opStatus.Generations)
-	webhookConfig, _, err = resourceapply.ApplyValidatingWebhookConfiguration(ctx, c.kubeClient.AdmissionregistrationV1(), syncCtx.Recorder(), webhookConfig, lastWebhookGeneration)
+	webhookConfig, _, err = resourceapply.ApplyValidatingWebhookConfiguration(ctx, c.kubeClient.AdmissionregistrationV1(), syncCtx.Recorder(), webhookConfig)
 	if err != nil {
 		return err
 	}
@@ -198,7 +197,7 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 		return nil
 	}
 
-	_, _, err = v1helpers.UpdateStatus(c.client,
+	_, _, err = v1helpers.UpdateStatus(ctx, c.client,
 		v1helpers.UpdateConditionFn(deploymentAvailable),
 		v1helpers.UpdateConditionFn(deploymentProgressing),
 		updateGenerationFn,
