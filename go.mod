@@ -6,7 +6,7 @@ require (
 	github.com/google/go-cmp v0.5.5
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
 	github.com/openshift/api v0.0.0-20210730095913-85e1d547cdee
-	github.com/openshift/build-machinery-go v0.0.0-20210712174854-1bb7fd1518d3
+	github.com/openshift/build-machinery-go v0.0.0-20211213093930-7e33a7eb4ce3
 	github.com/openshift/client-go v0.0.0-20210730113412-1811c1b3fc0e
 	github.com/openshift/library-go v0.0.0-20210830145332-4a9873bf5e74
 	github.com/prometheus/client_golang v1.11.0
