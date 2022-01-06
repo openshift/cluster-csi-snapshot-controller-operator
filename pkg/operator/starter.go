@@ -154,7 +154,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		go controller.Run(ctx, 1)
 	}
 	klog.Info("Starting the operator.")
-	go operator.Run(1, ctx.Done())
+	go operator.Run(ctx, 1)
 
 	<-ctx.Done()
 
