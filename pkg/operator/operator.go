@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -27,12 +28,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
-
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
-
-var log = logf.Log.WithName("csi_snapshot_controller_operator")
-var deploymentVersionHashKey = operatorv1.GroupName + "/rvs-hash"
 
 const (
 	targetName        = "csi-snapshot-controller"
@@ -47,18 +43,13 @@ const (
 	maxRetries = 15
 )
 
-// static environment variables from operator deployment
-var (
-	crdNames = []string{"volumesnapshotclasses.snapshot.storage.k8s.io", "volumesnapshotcontents.snapshot.storage.k8s.io", "volumesnapshots.snapshot.storage.k8s.io"}
-)
-
 type csiSnapshotOperator struct {
 	client        operatorclient.OperatorClient
 	kubeClient    kubernetes.Interface
 	versionGetter status.VersionGetter
 	eventRecorder events.Recorder
 
-	syncHandler func() error
+	syncHandler func(context.Context) error
 
 	infraLister     configlisterv1.InfrastructureLister
 	nodeLister      corelistersv1.NodeLister
@@ -68,7 +59,7 @@ type csiSnapshotOperator struct {
 
 	queue workqueue.RateLimitingInterface
 
-	stopCh <-chan struct{}
+	operatorContext context.Context
 
 	operatorVersion            string
 	operandVersion             string
@@ -116,23 +107,23 @@ func NewCSISnapshotControllerOperator(
 	return csiOperator
 }
 
-func (c *csiSnapshotOperator) Run(workers int, stopCh <-chan struct{}) {
+func (c *csiSnapshotOperator) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	c.stopCh = stopCh
+	c.operatorContext = ctx
 
-	if !cache.WaitForCacheSync(stopCh, c.crdListerSynced, c.client.Informer().HasSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.crdListerSynced, c.client.Informer().HasSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.worker, time.Second, stopCh)
+		go wait.Until(c.worker, time.Second, ctx.Done())
 	}
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *csiSnapshotOperator) sync() error {
+func (c *csiSnapshotOperator) sync(ctx context.Context) error {
 	instance, err := c.client.GetOperatorInstance()
 	if err != nil {
 		return err
@@ -162,7 +153,7 @@ func (c *csiSnapshotOperator) sync() error {
 	syncErr := c.handleSync(instanceCopy)
 	c.updateSyncError(&instanceCopy.Status.OperatorStatus, syncErr)
 
-	if _, _, err := v1helpers.UpdateStatus(c.client, func(status *operatorv1.OperatorStatus) error {
+	if _, _, err := v1helpers.UpdateStatus(ctx, c.client, func(status *operatorv1.OperatorStatus) error {
 		// store a copy of our starting conditions, we need to preserve last transition time
 		originalConditions := status.DeepCopy().Conditions
 
@@ -227,7 +218,7 @@ func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotControl
 }
 
 func (c *csiSnapshotOperator) setVersion(operandName, version string) {
-	if c.versionGetter.GetVersions()[operandName] != version {
+	if c.versionChanged(operandName, version) {
 		c.versionGetter.SetVersion(operandName, version)
 	}
 }
@@ -287,7 +278,7 @@ func (c *csiSnapshotOperator) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncHandler()
+	err := c.syncHandler(c.operatorContext)
 	c.handleErr(err, key)
 
 	return true

@@ -296,6 +296,10 @@ func validatingWebhookConfiguration(generation int64, modifiers ...validatingWeb
 	for _, modifier := range modifiers {
 		instance = modifier(instance)
 	}
+	// if any modifiers have been applied to our test configuration, we recalculate the hash
+	if len(modifiers) > 0 {
+		resourceapply.SetSpecHashAnnotation(&instance.ObjectMeta, instance.Webhooks)
+	}
 	return instance
 }
 

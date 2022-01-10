@@ -750,7 +750,7 @@ func TestSync(t *testing.T) {
 			ctx := newOperator(test)
 
 			// Act
-			err := ctx.operator.sync()
+			err := ctx.operator.sync(context.TODO())
 
 			// Assert
 			// Check error
