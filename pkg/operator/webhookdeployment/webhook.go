@@ -34,11 +34,12 @@ import (
 )
 
 type csiSnapshotWebhookController struct {
-	client        operatorclient.OperatorClient
-	kubeClient    kubernetes.Interface
-	nodeLister    corelistersv1.NodeLister
-	infraLister   configlisterv1.InfrastructureLister
-	eventRecorder events.Recorder
+	client           operatorclient.OperatorClient
+	kubeClient       kubernetes.Interface
+	nodeLister       corelistersv1.NodeLister
+	infraLister      configlisterv1.InfrastructureLister
+	eventRecorder    events.Recorder
+	performanceCache resourceapply.ResourceCache
 
 	queue workqueue.RateLimitingInterface
 
@@ -84,6 +85,7 @@ func NewCSISnapshotWebhookController(
 		eventRecorder:           eventRecorder,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
 		csiSnapshotWebhookImage: csiSnapshotWebhookImage,
+		performanceCache:        resourceapply.NewResourceCache(),
 	}
 
 	return factory.New().WithSync(c.sync).WithSyncDegradedOnError(client).WithInformers(
@@ -151,7 +153,7 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 	if err != nil {
 		return err
 	}
-	webhookConfig, _, err = resourceapply.ApplyValidatingWebhookConfiguration(ctx, c.kubeClient.AdmissionregistrationV1(), syncCtx.Recorder(), webhookConfig)
+	webhookConfig, _, err = resourceapply.ApplyValidatingWebhookConfigurationImproved(ctx, c.kubeClient.AdmissionregistrationV1(), syncCtx.Recorder(), webhookConfig, c.performanceCache)
 	if err != nil {
 		return err
 	}
