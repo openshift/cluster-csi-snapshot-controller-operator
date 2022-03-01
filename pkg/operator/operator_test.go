@@ -34,6 +34,14 @@ import (
 	core "k8s.io/client-go/testing"
 )
 
+var (
+	availableCondition   = conditionName(opv1.OperatorStatusTypeAvailable)
+	degradedCondition    = conditionName(opv1.OperatorStatusTypeDegraded)
+	progressingCondition = conditionName(opv1.OperatorStatusTypeProgressing)
+	upgradeableCondition = conditionName(opv1.OperatorStatusTypeUpgradeable)
+	preReqsCondition     = conditionName(opv1.OperatorStatusTypePrereqsSatisfied)
+)
+
 type operatorTest struct {
 	name            string
 	image           string
@@ -514,8 +522,8 @@ func TestSync(t *testing.T) {
 				csiSnapshotController: csiSnapshotController(
 					withStatus(replica0),
 					withGenerations(1),
-					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing),
-					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeAvailable)),
+					withTrueConditions(upgradeableCondition, preReqsCondition, progressingCondition),
+					withFalseConditions(degradedCondition, availableCondition)),
 			},
 			reactors: testReactors{
 				crds: addCRDEstablishedRector,
@@ -536,8 +544,8 @@ func TestSync(t *testing.T) {
 				csiSnapshotController: csiSnapshotController(
 					withStatus(replica1),
 					withGenerations(1),
-					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
-					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
+					withTrueConditions(availableCondition, upgradeableCondition, preReqsCondition),
+					withFalseConditions(degradedCondition, progressingCondition)),
 			},
 		},
 		{
@@ -561,8 +569,8 @@ func TestSync(t *testing.T) {
 				csiSnapshotController: csiSnapshotController(
 					withStatus(replica1),
 					withGenerations(3), // now the operator knows generation 1
-					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // Progressing due to Generation change
-					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
+					withTrueConditions(availableCondition, upgradeableCondition, preReqsCondition, progressingCondition), // Progressing due to Generation change
+					withFalseConditions(degradedCondition)),
 			},
 		},
 		{
@@ -578,8 +586,8 @@ func TestSync(t *testing.T) {
 					withStatus(replica1),
 					withGenerations(1),
 					withGeneration(1, 1),
-					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
-					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
+					withTrueConditions(availableCondition, upgradeableCondition, preReqsCondition),
+					withFalseConditions(degradedCondition, progressingCondition)),
 			},
 			expectedObjects: testObjects{
 				crds: getCRDs(withEstablishedConditions),
@@ -590,8 +598,8 @@ func TestSync(t *testing.T) {
 					withStatus(replica0),
 					withGenerations(1),
 					withGeneration(1, 1),
-					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // The operator is Progressing
-					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeAvailable)),                                             // The operator is not Available (no replica is running...)
+					withTrueConditions(upgradeableCondition, preReqsCondition, progressingCondition), // The operator is Progressing
+					withFalseConditions(degradedCondition, availableCondition)),                      // The operator is not Available (no replica is running...)
 			},
 		},
 		{
@@ -607,8 +615,8 @@ func TestSync(t *testing.T) {
 					withStatus(replica1),
 					withGenerations(1),
 					withGeneration(1, 1),
-					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied),
-					withFalseConditions(opv1.OperatorStatusTypeDegraded, opv1.OperatorStatusTypeProgressing)),
+					withTrueConditions(availableCondition, upgradeableCondition, preReqsCondition),
+					withFalseConditions(degradedCondition, progressingCondition)),
 			},
 			expectedObjects: testObjects{
 				crds: getCRDs(withEstablishedConditions),
@@ -619,8 +627,8 @@ func TestSync(t *testing.T) {
 					withStatus(replica0),
 					withGenerations(1),
 					withGeneration(1, 1),
-					withTrueConditions(opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeProgressing), // The operator is Progressing, but still Available
-					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
+					withTrueConditions(upgradeableCondition, preReqsCondition, availableCondition, progressingCondition), // The operator is Progressing, but still Available
+					withFalseConditions(degradedCondition)),
 			},
 		},
 		{
@@ -647,8 +655,8 @@ func TestSync(t *testing.T) {
 					withLogLevel(opv1.Trace),
 					withGenerations(2),
 					withGeneration(2, 2),
-					withTrueConditions(opv1.OperatorStatusTypeAvailable, opv1.OperatorStatusTypeUpgradeable, opv1.OperatorStatusTypePrereqsSatisfied, opv1.OperatorStatusTypeProgressing), // Progressing due to Generation change
-					withFalseConditions(opv1.OperatorStatusTypeDegraded)),
+					withTrueConditions(availableCondition, upgradeableCondition, preReqsCondition, progressingCondition), // Progressing due to Generation change
+					withFalseConditions(degradedCondition)),
 			},
 		},
 		// TODO: update of controller image
@@ -661,7 +669,7 @@ func TestSync(t *testing.T) {
 			},
 			expectedObjects: testObjects{
 				crds:                  []*apiextv1.CustomResourceDefinition{getCRDs()[0]}, // Only the first CRD is created
-				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
+				csiSnapshotController: csiSnapshotController(withTrueConditions(degradedCondition)),
 			},
 			expectErr: true,
 		},
@@ -675,7 +683,7 @@ func TestSync(t *testing.T) {
 			},
 			expectedObjects: testObjects{
 				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshot")},
-				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
+				csiSnapshotController: csiSnapshotController(withTrueConditions(degradedCondition)),
 			},
 			expectErr: true,
 			reactors: testReactors{
@@ -692,7 +700,7 @@ func TestSync(t *testing.T) {
 			},
 			expectedObjects: testObjects{
 				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotContent")},
-				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
+				csiSnapshotController: csiSnapshotController(withTrueConditions(degradedCondition)),
 			},
 			expectErr: true,
 			reactors: testReactors{
@@ -709,7 +717,7 @@ func TestSync(t *testing.T) {
 			},
 			expectedObjects: testObjects{
 				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotClass")},
-				csiSnapshotController: csiSnapshotController(withTrueConditions(opv1.OperatorStatusTypeDegraded)),
+				csiSnapshotController: csiSnapshotController(withTrueConditions(degradedCondition)),
 			},
 			expectErr: true,
 			reactors: testReactors{
