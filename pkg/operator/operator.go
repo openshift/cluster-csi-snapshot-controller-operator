@@ -31,9 +31,10 @@ import (
 )
 
 const (
-	targetName        = "csi-snapshot-controller"
-	targetNamespace   = "openshift-cluster-storage-operator"
-	operatorNamespace = "openshift-cluster-storage-operator"
+	snapshotControllerName = "CSISnapshotController"
+	targetName             = "csi-snapshot-controller"
+	targetNamespace        = "openshift-cluster-storage-operator"
+	operatorNamespace      = "openshift-cluster-storage-operator"
 
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
@@ -187,7 +188,7 @@ func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus,
 		}
 		v1helpers.SetOperatorCondition(&status.Conditions,
 			operatorv1.OperatorCondition{
-				Type:    operatorv1.OperatorStatusTypeDegraded,
+				Type:    conditionName(operatorv1.OperatorStatusTypeDegraded),
 				Status:  operatorv1.ConditionTrue,
 				Reason:  degradedReason,
 				Message: err.Error(),
@@ -195,7 +196,7 @@ func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus,
 	} else {
 		v1helpers.SetOperatorCondition(&status.Conditions,
 			operatorv1.OperatorCondition{
-				Type:   operatorv1.OperatorStatusTypeDegraded,
+				Type:   conditionName(operatorv1.OperatorStatusTypeDegraded),
 				Status: operatorv1.ConditionFalse,
 			})
 	}
