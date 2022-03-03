@@ -215,10 +215,10 @@ func (c *csiSnapshotOperator) syncStatus(instance *operatorv1.CSISnapshotControl
 	// Only set versions if we reached the desired state
 	isAvailable := v1helpers.IsOperatorConditionTrue(
 		instance.Status.Conditions,
-		operatorv1.OperatorStatusTypeAvailable)
+		conditionName(operatorv1.OperatorStatusTypeAvailable))
 	isProgressing := v1helpers.IsOperatorConditionTrue(
 		instance.Status.Conditions,
-		operatorv1.OperatorStatusTypeProgressing)
+		conditionName(operatorv1.OperatorStatusTypeProgressing))
 	if isAvailable && !isProgressing {
 		c.setVersion("operator", c.operatorVersion)
 		c.setVersion("csi-snapshot-controller", c.operandVersion)
@@ -231,13 +231,13 @@ func (c *csiSnapshotOperator) syncConditions(instance *operatorv1.CSISnapshotCon
 	// The operator does not have any prerequisites (at least now)
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypePrereqsSatisfied,
+			Type:   conditionName(operatorv1.OperatorStatusTypePrereqsSatisfied),
 			Status: operatorv1.ConditionTrue,
 		})
 	// The operator is always upgradeable (at least now)
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{
-			Type:   operatorv1.OperatorStatusTypeUpgradeable,
+			Type:   conditionName(operatorv1.OperatorStatusTypeUpgradeable),
 			Status: operatorv1.ConditionTrue,
 		})
 	c.syncProgressingCondition(instance, deployment)
@@ -249,13 +249,13 @@ func (c *csiSnapshotOperator) syncAvailableCondition(deployment *appsv1.Deployme
 	if deployment != nil && deployment.Status.AvailableReplicas > 0 {
 		v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 			operatorv1.OperatorCondition{
-				Type:   operatorv1.OperatorStatusTypeAvailable,
+				Type:   conditionName(operatorv1.OperatorStatusTypeAvailable),
 				Status: operatorv1.ConditionTrue,
 			})
 	} else {
 		v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 			operatorv1.OperatorCondition{
-				Type:    operatorv1.OperatorStatusTypeAvailable,
+				Type:    conditionName(operatorv1.OperatorStatusTypeAvailable),
 				Status:  operatorv1.ConditionFalse,
 				Message: "Waiting for Deployment to deploy csi-snapshot-controller pods",
 				Reason:  "Deploying",
@@ -306,9 +306,13 @@ func (c *csiSnapshotOperator) syncProgressingCondition(instance *operatorv1.CSIS
 	}
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{
-			Type:    operatorv1.OperatorStatusTypeProgressing,
+			Type:    conditionName(operatorv1.OperatorStatusTypeProgressing),
 			Status:  progressing,
 			Message: progressingMessage,
 			Reason:  reason,
 		})
+}
+
+func conditionName(condition string) string {
+	return snapshotControllerName + condition
 }

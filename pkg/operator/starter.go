@@ -62,7 +62,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		Informers: csiConfigInformers,
 		Client:    csiConfigClient.OperatorV1(),
 		ExpectedConditions: []string{
-			operatorv1.OperatorStatusTypeAvailable,
+			conditionName(operatorv1.OperatorStatusTypeAvailable),
 			webhookdeployment.WebhookControllerName + operatorv1.OperatorStatusTypeAvailable,
 		},
 	}
