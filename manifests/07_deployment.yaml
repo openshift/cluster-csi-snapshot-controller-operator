@@ -30,6 +30,11 @@ spec:
           requests:
             memory: 65Mi
             cpu: 10m
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         args: [ "start", "-v", "5" , "--config=/var/run/configmaps/config/operator-config.yaml"]
         env:
         - name: OPERAND_IMAGE
@@ -72,4 +77,7 @@ spec:
       securityContext:
         fsGroup: 10400
         runAsGroup: 10400
+        runAsNonRoot: true
         runAsUser: 10400
+        seccompProfile:
+          type: RuntimeDefault
