@@ -20,9 +20,18 @@ spec:
       labels:
         app: csi-snapshot-controller
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccount: csi-snapshot-controller
       containers:
         - name: snapshot-controller
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           image: quay.io/k8scsi/snapshot-controller:v2.2.0-rc1
           args:
             - "--v=5"
