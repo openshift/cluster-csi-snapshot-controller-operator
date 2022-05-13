@@ -39,6 +39,11 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -50,6 +55,10 @@ spec:
                 topologyKey: kubernetes.io/hostname
       priorityClassName: "system-cluster-critical"
       restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       nodeSelector:
         node-role.kubernetes.io/master: ""
       volumes:
