@@ -21,7 +21,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"github.com/openshift/library-go/pkg/operator/staticpod/controller/guard"
+	staticcontrollercommon "github.com/openshift/library-go/pkg/operator/staticpod/controller/common"
 	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -86,25 +86,25 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"webhook_deployment_pdb.yaml",
 		},
 		func() bool {
-			isSNO, precheckSucceeded, err := guard.IsSNOCheckFnc(configInformers.Config().V1().Infrastructures())()
+			isSNO, precheckSucceeded, err := staticcontrollercommon.NewIsSingleNodePlatformFn(configInformers.Config().V1().Infrastructures())()
 			if err != nil {
-				klog.Errorf("IsSNOCheckFnc failed: %v", err)
+				klog.Errorf("NewIsSingleNodePlatformFn failed: %v", err)
 				return false
 			}
 			if !precheckSucceeded {
-				klog.V(4).Infof("IsSNOCheckFnc precheck did not succeed, skipping")
+				klog.V(4).Infof("NewIsSingleNodePlatformFn precheck did not succeed, skipping")
 				return false
 			}
 			return !isSNO
 		},
 		func() bool {
-			isSNO, precheckSucceeded, err := guard.IsSNOCheckFnc(configInformers.Config().V1().Infrastructures())()
+			isSNO, precheckSucceeded, err := staticcontrollercommon.NewIsSingleNodePlatformFn(configInformers.Config().V1().Infrastructures())()
 			if err != nil {
-				klog.Errorf("IsSNOCheckFnc failed: %v", err)
+				klog.Errorf("NewIsSingleNodePlatformFn failed: %v", err)
 				return false
 			}
 			if !precheckSucceeded {
-				klog.V(4).Infof("IsSNOCheckFnc precheck did not succeed, skipping")
+				klog.V(4).Infof("NewIsSingleNodePlatformFn precheck did not succeed, skipping")
 				return false
 			}
 			return isSNO
