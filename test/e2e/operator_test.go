@@ -13,7 +13,7 @@ import (
 	framework "github.com/openshift/cluster-csi-snapshot-controller-operator/test/framework"
 	kapierrs "k8s.io/apimachinery/pkg/api/errors"
 
-	volumesnapshotsv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	volumesnapshotsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 )
 
 const (
