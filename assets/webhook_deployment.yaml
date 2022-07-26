@@ -34,6 +34,7 @@ spec:
           - name: certs
             mountPath: /etc/snapshot-validation-webhook/certs
             readOnly: true
+            optional: true
         imagePullPolicy: IfNotPresent
         resources:
           requests:

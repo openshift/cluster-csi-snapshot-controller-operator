@@ -168,6 +168,7 @@ func newOperator(test operatorTest) *testContext {
 		testVersion,
 		testVersion,
 		test.image,
+		defaultTargetNamespace,
 	)
 
 	return &testContext{
@@ -240,7 +241,7 @@ func withGenerations(depolymentGeneration int64) csiSnapshotControllerModifier {
 				Group:          appsv1.GroupName,
 				LastGeneration: depolymentGeneration,
 				Name:           targetName,
-				Namespace:      targetNamespace,
+				Namespace:      defaultTargetNamespace,
 				Resource:       "deployments",
 			},
 		}
@@ -800,7 +801,7 @@ func TestSync(t *testing.T) {
 
 			// Check expectedObjects.deployment
 			if test.expectedObjects.deployment != nil {
-				actualDeployment, err := ctx.coreClient.AppsV1().Deployments(targetNamespace).Get(context.TODO(), targetName, metav1.GetOptions{})
+				actualDeployment, err := ctx.coreClient.AppsV1().Deployments(defaultTargetNamespace).Get(context.TODO(), targetName, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Failed to get Deployment %s: %v", targetName, err)
 				}

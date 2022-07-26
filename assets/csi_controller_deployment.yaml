@@ -41,12 +41,16 @@ spec:
             - "--leader-election-lease-duration=137s"
             - "--leader-election-renew-deadline=107s"
             - "--leader-election-retry-period=26s"
+            # Force the namespace name for HyperShift
+            - "--leader-election-namespace=openshift-cluster-storage-operator"
+            # guest --kubeconfig= will be injected by the operator when running on HyperShift
           imagePullPolicy: IfNotPresent
           resources:
             requests:
               # TODO: measure on a real cluster
               cpu: 10m
               memory: 50Mi
+          # volumeMount with guest Kubeconfig will be added by the operator
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -71,3 +75,4 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: "NoSchedule"
+      # volume with guest Kubeconfig will be added by the operator

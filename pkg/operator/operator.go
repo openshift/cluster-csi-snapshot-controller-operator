@@ -33,7 +33,7 @@ import (
 const (
 	snapshotControllerName = "CSISnapshotController"
 	targetName             = "csi-snapshot-controller"
-	targetNamespace        = "openshift-cluster-storage-operator"
+	defaultTargetNamespace = "openshift-cluster-storage-operator"
 	operatorNamespace      = "openshift-cluster-storage-operator"
 
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
@@ -45,10 +45,10 @@ const (
 )
 
 type csiSnapshotOperator struct {
-	client        operatorclient.OperatorClient
-	kubeClient    kubernetes.Interface
-	versionGetter status.VersionGetter
-	eventRecorder events.Recorder
+	client               operatorclient.OperatorClient
+	managementKubeClient kubernetes.Interface
+	versionGetter        status.VersionGetter
+	eventRecorder        events.Recorder
 
 	syncHandler func(context.Context) error
 
@@ -65,6 +65,8 @@ type csiSnapshotOperator struct {
 	operatorVersion            string
 	operandVersion             string
 	csiSnapshotControllerImage string
+
+	operandNamespace string
 }
 
 func NewCSISnapshotControllerOperator(
@@ -74,18 +76,19 @@ func NewCSISnapshotControllerOperator(
 	crdClient apiextclient.Interface,
 	deployInformer appsinformersv1.DeploymentInformer,
 	infraLister configlisterv1.InfrastructureLister,
-	kubeClient kubernetes.Interface,
+	managementKubeClient kubernetes.Interface,
 	versionGetter status.VersionGetter,
 	eventRecorder events.Recorder,
 	operatorVersion string,
 	operandVersion string,
 	csiSnapshotControllerImage string,
+	operandNamespace string,
 ) *csiSnapshotOperator {
 	csiOperator := &csiSnapshotOperator{
 		client:                     client,
 		nodeLister:                 nodeInformer.Lister(),
 		crdClient:                  crdClient,
-		kubeClient:                 kubeClient,
+		managementKubeClient:       managementKubeClient,
 		versionGetter:              versionGetter,
 		eventRecorder:              eventRecorder,
 		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
@@ -93,6 +96,7 @@ func NewCSISnapshotControllerOperator(
 		operandVersion:             operandVersion,
 		csiSnapshotControllerImage: csiSnapshotControllerImage,
 		infraLister:                infraLister,
+		operandNamespace:           operandNamespace,
 	}
 
 	nodeInformer.Informer().AddEventHandler(csiOperator.eventHandler("node"))

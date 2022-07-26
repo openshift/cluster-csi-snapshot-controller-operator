@@ -16,6 +16,7 @@ import (
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operator/webhookdeployment"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
+	"github.com/openshift/library-go/pkg/config/client"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
@@ -25,6 +26,8 @@ import (
 	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -35,14 +38,35 @@ const (
 	resync = 20 * time.Minute
 )
 
-func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
-	cb, err := common.NewBuilder("")
+func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigFile string) error {
+	// Kubeconfig received through service account or --kubeconfig arg
+	// is for the management cluster.
+	managementKubeConfig := controllerConfig.KubeConfig
+	managementKubeClient := kubernetes.NewForConfigOrDie(rest.AddUserAgent(managementKubeConfig, targetName))
+	operandNamespace := defaultTargetNamespace
+
+	// Guest kubeconfig is the same as the management cluster one unless guestKubeConfigFile is provided
+	guestKubeConfig := controllerConfig.KubeConfig
+	var err error
+	if guestKubeConfigFile != "" {
+		guestKubeConfig, err = client.GetKubeConfigOrInClusterConfig(guestKubeConfigFile, nil)
+		if err != nil {
+			return fmt.Errorf("Failed use guest kubeconfig %s: %s", guestKubeConfigFile, err)
+		}
+		operandNamespace = controllerConfig.OperatorNamespace
+	}
+	guestKubeClient := kubernetes.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, targetName))
+
+	// Use guest kubeconfig for all objects in the guest cluster.
+	// If it's empty, then use $KUBECONFIG (= use the same as managedKubeConfig)
+	guestCB, err := common.NewBuilder(guestKubeConfig)
 	if err != nil {
 		klog.Fatalf("error creating clients: %v", err)
 	}
-	ctrlctx := common.CreateControllerContext(cb, ctx.Done(), targetNamespace)
+	ctrlctx := common.CreateControllerContext(guestCB, ctx.Done(), operandNamespace)
 
-	csiConfigClient, err := csisnapshotconfigclient.NewForConfig(controllerConfig.KubeConfig)
+	// Use guest kubeconfig for the operator CR
+	csiConfigClient, err := csisnapshotconfigclient.NewForConfig(guestKubeConfig)
 	if err != nil {
 		return err
 	}
@@ -51,7 +75,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		informer.WithTweakListOptions(singleNameListOptions(operatorclient.GlobalConfigName)),
 	)
 
-	configClient, err := configclient.NewForConfig(controllerConfig.KubeConfig)
+	// Use guest config for Infrastructure and ClusterOperator
+	configClient, err := configclient.NewForConfig(guestKubeConfig)
 	if err != nil {
 		return err
 	}
@@ -67,16 +92,18 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		},
 	}
 
-	kubeClient := ctrlctx.ClientBuilder.KubeClientOrDie(targetName)
-
 	versionGetter := status.NewVersionGetter()
 
-	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, operatorNamespace, targetNamespace)
+	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient)
+	managementKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(managementKubeClient, operandNamespace)
+
+	// Create PDBs in the management cluster
+	// TODO: replace namespace!
 	staticResourcesController := staticresourcecontroller.NewStaticResourceController(
 		"CSISnapshotStaticResourceController",
 		assets.ReadFile,
 		[]string{},
-		(&resourceapply.ClientHolder{}).WithKubernetes(kubeClient),
+		(&resourceapply.ClientHolder{}).WithKubernetes(managementKubeClient),
 		operatorClient,
 		controllerConfig.EventRecorder,
 	).WithConditionalResources(
@@ -109,7 +136,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			}
 			return isSNO
 		},
-	).AddKubeInformers(kubeInformersForNamespaces)
+	).AddKubeInformers(guestKubeInformersForNamespaces)
 
 	operator := NewCSISnapshotControllerOperator(
 		*operatorClient,
@@ -118,12 +145,13 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlctx.ClientBuilder.APIExtClientOrDie(targetName),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		configInformers.Config().V1().Infrastructures().Lister(),
-		kubeClient,
+		managementKubeClient,
 		versionGetter,
 		controllerConfig.EventRecorder,
 		os.Getenv(operatorVersionEnvName),
 		os.Getenv(operandVersionEnvName),
 		os.Getenv(operandImageEnvName),
+		operandNamespace,
 	)
 
 	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(
@@ -132,16 +160,16 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		ctrlctx.KubeNamespacedInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations(),
 		configInformers.Config().V1().Infrastructures(),
-		kubeClient,
+		managementKubeClient,
 		controllerConfig.EventRecorder,
 		os.Getenv(webhookImageEnvName),
+		operandNamespace,
 	)
 
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
 		targetName,
 		[]configv1.ObjectReference{
-			{Resource: "namespaces", Name: targetNamespace},
-			{Resource: "namespaces", Name: operatorNamespace},
+			{Resource: "namespaces", Name: operandNamespace},
 			{Group: operatorv1.GroupName, Resource: "csisnapshotcontrollers", Name: operatorclient.GlobalConfigName},
 		},
 		configClient.ConfigV1(),
@@ -152,7 +180,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	)
 
 	logLevelController := loglevel.NewClusterOperatorLoggingController(operatorClient, controllerConfig.EventRecorder)
-	// TODO remove this controller once we support Removed
 	managementStateController := managementstatecontroller.NewOperatorManagementStateController(targetName, operatorClient, controllerConfig.EventRecorder)
 	management.SetOperatorNotRemovable()
 
@@ -162,7 +189,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}{
 		csiConfigInformers,
 		configInformers,
-		kubeInformersForNamespaces,
+		guestKubeInformersForNamespaces,
+		managementKubeInformersForNamespaces,
 		ctrlctx.APIExtInformerFactory,         // CRDs
 		ctrlctx.KubeNamespacedInformerFactory, // operand Deployment
 	} {

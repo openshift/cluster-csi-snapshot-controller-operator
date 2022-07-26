@@ -124,6 +124,7 @@ func newOperator(test operatorTest) *testContext {
 		coreClient,
 		recorder,
 		test.image,
+		"openshift-cluster-storage-operator",
 	)
 
 	return &testContext{

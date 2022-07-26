@@ -8,6 +8,7 @@ import (
 
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -132,9 +133,13 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 		return nil, err
 	}
 
+	if c.operandNamespace != "" {
+		deploy.ObjectMeta.Namespace = c.operandNamespace
+	}
+
 	deploy, _, err = resourceapply.ApplyDeployment(
 		context.TODO(),
-		c.kubeClient.AppsV1(),
+		c.managementKubeClient.AppsV1(),
 		c.eventRecorder,
 		deploy,
 		resourcemerge.ExpectedDeploymentGeneration(deploy, instance.Status.Generations))
@@ -167,7 +172,7 @@ func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnap
 	// If the topology mode is external, there are no master nodes. Update the
 	// node selector to remove the master node selector.
 	if infra.Status.ControlPlaneTopology == configv1.ExternalTopologyMode {
-		deployment.Spec.Template.Spec.NodeSelector = map[string]string{}
+		c.updateHyperShiftDeployment(deployment)
 	}
 
 	nodeSelector := deployment.Spec.Template.Spec.NodeSelector
@@ -186,6 +191,40 @@ func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnap
 	deployment.Spec.Replicas = &replicas
 
 	return deployment, nil
+}
+
+func (c *csiSnapshotOperator) updateHyperShiftDeployment(deployment *appsv1.Deployment) {
+	controllerSpec := &deployment.Spec.Template.Spec
+	controllerSpec.NodeSelector = map[string]string{}
+
+	// TODO: add HyperShift's priorityClass? https://hypershift-docs.netlify.app/how-to/distribute-hosted-cluster-workloads/
+
+	// inject guest --kubeconfig + a Secret volume with the content
+	controllerSpec.Containers[0].Args = append(controllerSpec.Containers[0].Args, "--kubeconfig=/etc/kubernetes/kubeconfig")
+
+	kubeConfigVolume := v1.Volume{
+		Name: "kubeconfig",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				// TODO: use a snapshot-controller specific kubeconfig
+				SecretName: "admin-kubeconfig",
+			},
+		},
+	}
+	if controllerSpec.Volumes == nil {
+		controllerSpec.Volumes = []v1.Volume{}
+	}
+	controllerSpec.Volumes = append(controllerSpec.Volumes, kubeConfigVolume)
+
+	kubeConfigMount := v1.VolumeMount{
+		Name:      "kubeconfig",
+		ReadOnly:  true,
+		MountPath: "/etc/kubernetes",
+	}
+	if controllerSpec.Containers[0].VolumeMounts == nil {
+		controllerSpec.Containers[0].VolumeMounts = []v1.VolumeMount{}
+	}
+	controllerSpec.Containers[0].VolumeMounts = append(controllerSpec.Containers[0].VolumeMounts, kubeConfigMount)
 }
 
 func getLogLevel(logLevel operatorv1.LogLevel) int {

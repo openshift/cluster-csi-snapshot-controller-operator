@@ -34,16 +34,17 @@ import (
 )
 
 type csiSnapshotWebhookController struct {
-	client           operatorclient.OperatorClient
-	kubeClient       kubernetes.Interface
-	nodeLister       corelistersv1.NodeLister
-	infraLister      configlisterv1.InfrastructureLister
-	eventRecorder    events.Recorder
-	performanceCache resourceapply.ResourceCache
+	client               operatorclient.OperatorClient
+	managementKubeClient kubernetes.Interface
+	nodeLister           corelistersv1.NodeLister
+	infraLister          configlisterv1.InfrastructureLister
+	eventRecorder        events.Recorder
+	performanceCache     resourceapply.ResourceCache
 
 	queue workqueue.RateLimitingInterface
 
 	csiSnapshotWebhookImage string
+	operandNamespace        string
 }
 
 const (
@@ -73,19 +74,21 @@ func NewCSISnapshotWebhookController(
 	deployInformer appsinformersv1.DeploymentInformer,
 	webhookInformer admissionnformersv1.ValidatingWebhookConfigurationInformer,
 	infraInformer configinformerv1.InfrastructureInformer,
-	kubeClient kubernetes.Interface,
+	manamegentKubeClient kubernetes.Interface,
 	eventRecorder events.Recorder,
 	csiSnapshotWebhookImage string,
+	operandNamespace string,
 ) factory.Controller {
 	c := &csiSnapshotWebhookController{
 		client:                  client,
-		kubeClient:              kubeClient,
+		managementKubeClient:    manamegentKubeClient,
 		nodeLister:              nodeInformer.Lister(),
 		infraLister:             infraInformer.Lister(),
 		eventRecorder:           eventRecorder,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
 		csiSnapshotWebhookImage: csiSnapshotWebhookImage,
 		performanceCache:        resourceapply.NewResourceCache(),
+		operandNamespace:        operandNamespace,
 	}
 
 	return factory.New().WithSync(c.sync).WithSyncDegradedOnError(client).WithInformers(
@@ -115,35 +118,24 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 		return err
 	}
 
+	if c.operandNamespace != "" {
+		deployment.ObjectMeta.Namespace = c.operandNamespace
+	}
+
 	infra, err := c.infraLister.Get(infraConfigName)
 	if err != nil {
 		return err
 	}
-	// If the topology mode is external, there are no master nodes. Update the
-	// node selector to remove the master node selector.
 	if infra.Status.ControlPlaneTopology == configv1.ExternalTopologyMode {
-		deployment.Spec.Template.Spec.NodeSelector = map[string]string{}
+		c.updateHyperShiftDeployment(deployment)
+	} else {
+		if err := c.updateStandaloneDeployment(deployment); err != nil {
+			return err
+		}
 	}
-
-	// Set the number of replicas according to the number of nodes available
-	nodeSelector := deployment.Spec.Template.Spec.NodeSelector
-	nodes, err := c.nodeLister.List(labels.SelectorFromSet(nodeSelector))
-	if err != nil {
-		// This will set Degraded condition
-		return err
-	}
-
-	// Set the deployment.Spec.Replicas field according to the number
-	// of available nodes. If the number of available nodes is bigger
-	// than 1, then the number of replicas will be 2.
-	replicas := int32(1)
-	if len(nodes) > 1 {
-		replicas = int32(2)
-	}
-	deployment.Spec.Replicas = &replicas
 
 	lastGeneration := resourcemerge.ExpectedDeploymentGeneration(deployment, opStatus.Generations)
-	deployment, _, err = resourceapply.ApplyDeployment(ctx, c.kubeClient.AppsV1(), syncCtx.Recorder(), deployment, lastGeneration)
+	deployment, _, err = resourceapply.ApplyDeployment(ctx, c.managementKubeClient.AppsV1(), syncCtx.Recorder(), deployment, lastGeneration)
 	if err != nil {
 		// This will set Degraded condition
 		return err
@@ -153,7 +145,8 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 	if err != nil {
 		return err
 	}
-	webhookConfig, _, err = resourceapply.ApplyValidatingWebhookConfigurationImproved(ctx, c.kubeClient.AdmissionregistrationV1(), syncCtx.Recorder(), webhookConfig, c.performanceCache)
+
+	webhookConfig, _, err = resourceapply.ApplyValidatingWebhookConfigurationImproved(ctx, c.managementKubeClient.AdmissionregistrationV1(), syncCtx.Recorder(), webhookConfig, c.performanceCache)
 	if err != nil {
 		return err
 	}
@@ -207,6 +200,29 @@ func (c *csiSnapshotWebhookController) sync(ctx context.Context, syncCtx factory
 	return err
 }
 
+func (c *csiSnapshotWebhookController) updateStandaloneDeployment(deployment *appsv1.Deployment) error {
+	// Set the number of replicas according to the number of nodes available
+	nodeSelector := deployment.Spec.Template.Spec.NodeSelector
+	nodes, err := c.nodeLister.List(labels.SelectorFromSet(nodeSelector))
+	if err != nil {
+		// This will set Degraded condition
+		return err
+	}
+	// Set the deployment.Spec.Replicas field according to the number
+	// of available nodes. If the number of available nodes is bigger
+	// than 1, then the number of replicas will be 2.
+	replicas := int32(1)
+	if len(nodes) > 1 {
+		replicas = int32(2)
+	}
+	deployment.Spec.Replicas = &replicas
+	return nil
+}
+
+func (c *csiSnapshotWebhookController) updateHyperShiftDeployment(deployment *appsv1.Deployment) {
+	deployment.Spec.Template.Spec.NodeSelector = map[string]string{}
+}
+
 func (c *csiSnapshotWebhookController) getDeployment(opSpec *operatorapi.OperatorSpec) (*appsv1.Deployment, error) {
 	deploymentBytes, err := assets.ReadFile(deploymentAsset)
 	if err != nil {
@@ -225,7 +241,6 @@ func (c *csiSnapshotWebhookController) getDeployment(opSpec *operatorapi.Operato
 
 	deployment := resourceread.ReadDeploymentV1OrDie([]byte(deploymentString))
 	return deployment, nil
-
 }
 
 func getWebhookConfig() (*admissionv1.ValidatingWebhookConfiguration, error) {
