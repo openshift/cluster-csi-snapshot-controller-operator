@@ -2,7 +2,6 @@ package operator
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -10,9 +9,6 @@ import (
 	configlisterv1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	corev1 "k8s.io/api/core/v1"
-	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextinformersv1 "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
-	apiextlistersv1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,11 +48,8 @@ type csiSnapshotOperator struct {
 
 	syncHandler func(context.Context) error
 
-	infraLister     configlisterv1.InfrastructureLister
-	nodeLister      corelistersv1.NodeLister
-	crdLister       apiextlistersv1.CustomResourceDefinitionLister
-	crdListerSynced cache.InformerSynced
-	crdClient       apiextclient.Interface
+	infraLister configlisterv1.InfrastructureLister
+	nodeLister  corelistersv1.NodeLister
 
 	queue workqueue.RateLimitingInterface
 
@@ -70,8 +63,6 @@ type csiSnapshotOperator struct {
 func NewCSISnapshotControllerOperator(
 	client operatorclient.OperatorClient,
 	nodeInformer coreinformersv1.NodeInformer,
-	crdInformer apiextinformersv1.CustomResourceDefinitionInformer,
-	crdClient apiextclient.Interface,
 	deployInformer appsinformersv1.DeploymentInformer,
 	infraLister configlisterv1.InfrastructureLister,
 	kubeClient kubernetes.Interface,
@@ -84,7 +75,6 @@ func NewCSISnapshotControllerOperator(
 	csiOperator := &csiSnapshotOperator{
 		client:                     client,
 		nodeLister:                 nodeInformer.Lister(),
-		crdClient:                  crdClient,
 		kubeClient:                 kubeClient,
 		versionGetter:              versionGetter,
 		eventRecorder:              eventRecorder,
@@ -96,14 +86,10 @@ func NewCSISnapshotControllerOperator(
 	}
 
 	nodeInformer.Informer().AddEventHandler(csiOperator.eventHandler("node"))
-	crdInformer.Informer().AddEventHandler(csiOperator.eventHandler("crd"))
 	deployInformer.Informer().AddEventHandler(csiOperator.eventHandler("deployment"))
 	client.Informer().AddEventHandler(csiOperator.eventHandler("csisnapshotcontroller"))
 
 	csiOperator.syncHandler = csiOperator.sync
-
-	csiOperator.crdLister = crdInformer.Lister()
-	csiOperator.crdListerSynced = crdInformer.Informer().HasSynced
 
 	return csiOperator
 }
@@ -113,10 +99,6 @@ func (c *csiSnapshotOperator) Run(ctx context.Context, workers int) {
 	defer c.queue.ShutDown()
 
 	c.operatorContext = ctx
-
-	if !cache.WaitForCacheSync(ctx.Done(), c.crdListerSynced, c.client.Informer().HasSynced) {
-		return
-	}
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(c.worker, time.Second, ctx.Done())
@@ -139,7 +121,6 @@ func (c *csiSnapshotOperator) sync(ctx context.Context) error {
 	// Watch CRs for:
 	// - CSISnapshots
 	// - Deployments
-	// - CRD
 	// - Status?
 
 	// Ensure the CSISnapshotController deployment exists and matches the default
@@ -182,10 +163,6 @@ func (c *csiSnapshotOperator) sync(ctx context.Context) error {
 func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus, err error) {
 	if err != nil {
 		degradedReason := "OperatorSync"
-		var errAlpha *AlphaCRDError
-		if errors.As(err, &errAlpha) {
-			degradedReason = "AlphaCRDsExist"
-		}
 		v1helpers.SetOperatorCondition(&status.Conditions,
 			operatorv1.OperatorCondition{
 				Type:    conditionName(operatorv1.OperatorStatusTypeDegraded),
@@ -203,11 +180,6 @@ func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus,
 }
 
 func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotController) error {
-	if err := c.syncCustomResourceDefinitions(); err != nil {
-		// Pass through AlphaCRDError via %w
-		return fmt.Errorf("failed to sync CRDs: %w", err)
-	}
-
 	deployment, err := c.syncDeployment(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync Deployments: %s", err)
@@ -235,7 +207,7 @@ func (c *csiSnapshotOperator) enqueue(obj interface{}) {
 		return
 	}
 	// Sync corresponding CSISnapshotController instance. Since there is only one, sync that one.
-	// It will check all other objects (CRDs, Deployment) and update/overwrite them as needed.
+	// It will check all other objects (Deployment) and update/overwrite them as needed.
 	c.queue.Add(operatorclient.GlobalConfigName)
 }
 

@@ -23,9 +23,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	fakeextapi "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	apiextinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,8 +52,6 @@ type testContext struct {
 	operator          *csiSnapshotOperator
 	coreClient        *fakecore.Clientset
 	coreInformers     coreinformers.SharedInformerFactory
-	extAPIClient      *fakeextapi.Clientset
-	extAPIInformers   apiextinformers.SharedInformerFactory
 	operatorClient    *fakeop.Clientset
 	operatorInformers opinformers.SharedInformerFactory
 	configClient      *fakecfg.Clientset
@@ -66,17 +61,14 @@ type testContext struct {
 type testObjects struct {
 	nodes                 []*v1.Node
 	deployment            *appsv1.Deployment
-	crds                  []*apiextv1.CustomResourceDefinition
 	csiSnapshotController *opv1.CSISnapshotController
 }
 
 type addCoreReactors func(*fakecore.Clientset, coreinformers.SharedInformerFactory)
-type addExtAPIReactors func(*fakeextapi.Clientset, apiextinformers.SharedInformerFactory)
 type addOperatorReactors func(*fakeop.Clientset, opinformers.SharedInformerFactory)
 
 type testReactors struct {
 	deployments            addCoreReactors
-	crds                   addExtAPIReactors
 	csiSnapshotControllers addOperatorReactors
 }
 
@@ -107,21 +99,6 @@ func newOperator(test operatorTest) *testContext {
 	}
 	if test.reactors.deployments != nil {
 		test.reactors.deployments(coreClient, coreInformerFactory)
-	}
-
-	// Convert to []runtime.Object
-	initialCRDs := make([]runtime.Object, len(test.initialObjects.crds))
-	for i := range test.initialObjects.crds {
-		initialCRDs[i] = test.initialObjects.crds[i]
-	}
-	extAPIClient := fakeextapi.NewSimpleClientset(initialCRDs...)
-	extAPIInformerFactory := apiextinformers.NewSharedInformerFactory(extAPIClient, 0)
-	// Fill the informer
-	for i := range test.initialObjects.crds {
-		extAPIInformerFactory.Apiextensions().V1().CustomResourceDefinitions().Informer().GetIndexer().Add(test.initialObjects.crds[i])
-	}
-	if test.reactors.crds != nil {
-		test.reactors.crds(extAPIClient, extAPIInformerFactory)
 	}
 
 	// Convert to []runtime.Object
@@ -158,8 +135,6 @@ func newOperator(test operatorTest) *testContext {
 	recorder := events.NewInMemoryRecorder("operator")
 	op := NewCSISnapshotControllerOperator(client,
 		coreInformerFactory.Core().V1().Nodes(),
-		extAPIInformerFactory.Apiextensions().V1().CustomResourceDefinitions(),
-		extAPIClient,
 		coreInformerFactory.Apps().V1().Deployments(),
 		configInformerFactory.Config().V1().Infrastructures().Lister(),
 		coreClient,
@@ -174,8 +149,6 @@ func newOperator(test operatorTest) *testContext {
 		operator:          op,
 		coreClient:        coreClient,
 		coreInformers:     coreInformerFactory,
-		extAPIClient:      extAPIClient,
-		extAPIInformers:   extAPIInformerFactory,
 		operatorClient:    operatorClient,
 		operatorInformers: operatorInformerFactory,
 	}
@@ -332,139 +305,6 @@ func withDeploymentGeneration(generations ...int64) deploymentModifier {
 	}
 }
 
-// CRDs
-
-type crdModifier func(*apiextv1.CustomResourceDefinition) *apiextv1.CustomResourceDefinition
-
-func getCRDs(modifiers ...crdModifier) []*apiextv1.CustomResourceDefinition {
-	crdObjects := make([]*apiextv1.CustomResourceDefinition, 3)
-	for i, file := range crds {
-		crdBytes, err := assets.ReadFile(file)
-		if err != nil {
-			panic(err)
-		}
-		crd := resourceread.ReadCustomResourceDefinitionV1OrDie(crdBytes)
-		for _, modifier := range modifiers {
-			crd = modifier(crd)
-		}
-		crdObjects[i] = crd
-	}
-	return crdObjects
-}
-
-func withEstablishedConditions(instance *apiextv1.CustomResourceDefinition) *apiextv1.CustomResourceDefinition {
-	instance.Status.Conditions = []apiextv1.CustomResourceDefinitionCondition{
-		{
-			Type:   apiextv1.Established,
-			Status: apiextv1.ConditionTrue,
-		},
-	}
-	return instance
-}
-
-func getAlphaCRD(crdName string) *apiextv1.CustomResourceDefinition {
-	var crdFile string
-	switch crdName {
-	case "VolumeSnapshot":
-		crdFile = `
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-    name: volumesnapshots.snapshot.storage.k8s.io
-spec:
-    conversion:
-      strategy: None
-    group: snapshot.storage.k8s.io
-    names:
-      kind: VolumeSnapshot
-      listKind: VolumeSnapshotList
-      plural: volumesnapshots
-      singular: volumesnapshot
-    preserveUnknownFields: true
-    scope: Namespaced
-    versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-    subresources:
-      status: {}
-`
-
-	case "VolumeSnapshotContent":
-		crdFile = `
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-    name: volumesnapshotcontents.snapshot.storage.k8s.io
-spec:
-    conversion:
-      strategy: None
-    group: snapshot.storage.k8s.io
-    names:
-      kind: VolumeSnapshotContent
-      listKind: VolumeSnapshotContentList
-      plural: volumesnapshotcontents
-      singular: volumesnapshotcontent
-    preserveUnknownFields: true
-    scope: Cluster
-    versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-`
-	case "VolumeSnapshotClass":
-		crdFile = `
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-    name: volumesnapshotclasses.snapshot.storage.k8s.io
-spec:
-    conversion:
-      strategy: None
-    group: snapshot.storage.k8s.io
-    names:
-      kind: VolumeSnapshotClass
-      listKind: VolumeSnapshotClassList
-      plural: volumesnapshotclasses
-      singular: volumesnapshotclass
-    preserveUnknownFields: true
-    scope: Cluster
-    versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-    subresources:
-      status:
-`
-	default:
-		panic(crdName)
-	}
-	return resourceread.ReadCustomResourceDefinitionV1OrDie([]byte(crdFile))
-}
-
-// Optional reactor that sets Established condition to True. It's needed by the operator that polls for CRDs until they get the condition
-func addCRDEstablishedRector(client *fakeextapi.Clientset, informer apiextinformers.SharedInformerFactory) {
-	client.PrependReactor("*", "customresourcedefinitions", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		switch a := action.(type) {
-		case core.CreateActionImpl:
-			object := a.GetObject()
-			crd := object.(*apiextv1.CustomResourceDefinition)
-			crd = crd.DeepCopy()
-			crd = withEstablishedConditions(crd)
-			informer.Apiextensions().V1().CustomResourceDefinitions().Informer().GetIndexer().Add(crd)
-			return false, crd, nil
-		case core.UpdateActionImpl:
-			object := a.GetObject()
-			crd := object.(*apiextv1.CustomResourceDefinition)
-			crd = crd.DeepCopy()
-			crd = withEstablishedConditions(crd)
-			informer.Apiextensions().V1().CustomResourceDefinitions().Informer().GetIndexer().Update(crd)
-			return false, crd, nil
-		}
-		return false, nil, nil
-	})
-}
-
 // This reactor is always enabled and bumps Deployment generation when it gets updated.
 func addGenerationReactor(client *fakecore.Clientset) {
 	client.PrependReactor("*", "deployments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -517,7 +357,6 @@ func TestSync(t *testing.T) {
 				csiSnapshotController: csiSnapshotController(),
 			},
 			expectedObjects: testObjects{
-				crds:       getCRDs(),
 				deployment: getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 0)),
 				csiSnapshotController: csiSnapshotController(
 					withStatus(replica0),
@@ -525,21 +364,16 @@ func TestSync(t *testing.T) {
 					withTrueConditions(upgradeableCondition, preReqsCondition, progressingCondition),
 					withFalseConditions(degradedCondition, availableCondition)),
 			},
-			reactors: testReactors{
-				crds: addCRDEstablishedRector,
-			},
 		},
 		{
 			// Deployment is fully deployed and its status is synced to CSISnapshotController
 			name:  "deployment fully deployed",
 			image: defaultImage,
 			initialObjects: testObjects{
-				crds:                  getCRDs(withEstablishedConditions),
 				deployment:            getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
 				csiSnapshotController: csiSnapshotController(withGenerations(1)),
 			},
 			expectedObjects: testObjects{
-				crds:       getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
 				csiSnapshotController: csiSnapshotController(
 					withStatus(replica1),
@@ -553,7 +387,6 @@ func TestSync(t *testing.T) {
 			name:  "deployment modified by user",
 			image: defaultImage,
 			initialObjects: testObjects{
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentReplicas(2),      // User changed replicas
 					withDeploymentGeneration(2, 1), // ... which changed Generation
@@ -561,7 +394,6 @@ func TestSync(t *testing.T) {
 				csiSnapshotController: csiSnapshotController(withGenerations(1)), // the operator knows the old generation of the Deployment
 			},
 			expectedObjects: testObjects{
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentReplicas(1),      // The operator fixed replica count
 					withDeploymentGeneration(3, 1), // ... which bumps generation again
@@ -578,7 +410,6 @@ func TestSync(t *testing.T) {
 			name:  "deployment degraded",
 			image: defaultImage,
 			initialObjects: testObjects{
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // the Deployment has no pods
@@ -590,7 +421,6 @@ func TestSync(t *testing.T) {
 					withFalseConditions(degradedCondition, progressingCondition)),
 			},
 			expectedObjects: testObjects{
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // No change to the Deployment
@@ -607,7 +437,6 @@ func TestSync(t *testing.T) {
 			name:  "update",
 			image: defaultImage,
 			initialObjects: testObjects{
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1 /*ready*/, 1 /*available*/, 0 /*updated*/)), // the Deployment is updating 1 pod
@@ -619,7 +448,6 @@ func TestSync(t *testing.T) {
 					withFalseConditions(degradedCondition, progressingCondition)),
 			},
 			expectedObjects: testObjects{
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1, 1, 0)), // No change to the Deployment
@@ -636,7 +464,6 @@ func TestSync(t *testing.T) {
 			name:  "log level change",
 			image: defaultImage,
 			initialObjects: testObjects{
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
@@ -646,7 +473,6 @@ func TestSync(t *testing.T) {
 					withGeneration(2, 1)),    //... which caused the Generation to increase
 			},
 			expectedObjects: testObjects{
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel6, defaultImage, // The operator changed cmdline arguments with a new log level
 					withDeploymentGeneration(2, 1), // ... which caused the Generation to increase
 					withDeploymentStatus(replica1, replica1, replica1)),
@@ -661,70 +487,6 @@ func TestSync(t *testing.T) {
 		},
 		// TODO: update of controller image
 		{
-			// error: timed out waiting for CRD to get Established condition
-			name:  "timeout waiting for CRD",
-			image: defaultImage,
-			initialObjects: testObjects{
-				csiSnapshotController: csiSnapshotController(),
-			},
-			expectedObjects: testObjects{
-				crds:                  []*apiextv1.CustomResourceDefinition{getCRDs()[0]}, // Only the first CRD is created
-				csiSnapshotController: csiSnapshotController(withTrueConditions(degradedCondition)),
-			},
-			expectErr: true,
-		},
-		{
-			// error: v1alpha1 VolumeSnapshot already exists
-			name:  "v1alpha1 VolumeSnapshot",
-			image: defaultImage,
-			initialObjects: testObjects{
-				csiSnapshotController: csiSnapshotController(),
-				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshot")},
-			},
-			expectedObjects: testObjects{
-				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshot")},
-				csiSnapshotController: csiSnapshotController(withTrueConditions(degradedCondition)),
-			},
-			expectErr: true,
-			reactors: testReactors{
-				crds: addCRDEstablishedRector,
-			},
-		},
-		{
-			// error: v1alpha1 VolumeSnapshotContent already exists
-			name:  "v1alpha1 VolumeSnapshotContent",
-			image: defaultImage,
-			initialObjects: testObjects{
-				csiSnapshotController: csiSnapshotController(),
-				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotContent")},
-			},
-			expectedObjects: testObjects{
-				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotContent")},
-				csiSnapshotController: csiSnapshotController(withTrueConditions(degradedCondition)),
-			},
-			expectErr: true,
-			reactors: testReactors{
-				crds: addCRDEstablishedRector,
-			},
-		},
-		{
-			// error: v1alpha1 VolumeSnapshotClass already exists
-			name:  "v1alpha1 VolumeSnapshotClass",
-			image: defaultImage,
-			initialObjects: testObjects{
-				csiSnapshotController: csiSnapshotController(),
-				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotClass")},
-			},
-			expectedObjects: testObjects{
-				crds:                  []*apiextv1.CustomResourceDefinition{getAlphaCRD("VolumeSnapshotClass")},
-				csiSnapshotController: csiSnapshotController(withTrueConditions(degradedCondition)),
-			},
-			expectErr: true,
-			reactors: testReactors{
-				crds: addCRDEstablishedRector,
-			},
-		},
-		{
 			// Deployment replicas is adjusted according to number of node selector
 			name:  "number of replicas is set accordingly",
 			image: defaultImage,
@@ -734,7 +496,6 @@ func TestSync(t *testing.T) {
 					makeNode("B", masterNodeLabels),
 					makeNode("C", masterNodeLabels),
 				},
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentReplicas(1), // just 1 replica
 					withDeploymentGeneration(1, 1),
@@ -742,7 +503,6 @@ func TestSync(t *testing.T) {
 				csiSnapshotController: csiSnapshotController(withGenerations(1)),
 			},
 			expectedObjects: testObjects{
-				crds: getCRDs(withEstablishedConditions),
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentReplicas(2),      // The operator fixed replica count
 					withDeploymentGeneration(2, 1), // ... which bumps generation again
@@ -767,35 +527,6 @@ func TestSync(t *testing.T) {
 			}
 			if err == nil && test.expectErr {
 				t.Error("sync() unexpectedly succeeded when error was expected")
-			}
-
-			// Check expectedObjects.crds
-			actualCRDList, _ := ctx.extAPIClient.ApiextensionsV1().CustomResourceDefinitions().List(context.TODO(), metav1.ListOptions{})
-			actualCRDs := map[string]*apiextv1.CustomResourceDefinition{}
-			for i := range actualCRDList.Items {
-				crd := &actualCRDList.Items[i]
-				actualCRDs[crd.Name] = crd
-			}
-			expectedCRDs := map[string]*apiextv1.CustomResourceDefinition{}
-			for _, crd := range test.expectedObjects.crds {
-				expectedCRDs[crd.Name] = crd
-			}
-
-			for name, actualCRD := range actualCRDs {
-				expectedCRD, found := expectedCRDs[name]
-				if !found {
-					t.Errorf("Unexpected CRD found: %s", name)
-					continue
-				}
-				if !equality.Semantic.DeepEqual(expectedCRD, actualCRD) {
-					t.Errorf("Unexpected CRD %+v content:\n%s", name, cmp.Diff(expectedCRD, actualCRD))
-				}
-				delete(expectedCRDs, name)
-			}
-			if len(expectedCRDs) > 0 {
-				for _, crd := range expectedCRDs {
-					t.Errorf("CRD %s not created by sync()", crd.Name)
-				}
 			}
 
 			// Check expectedObjects.deployment

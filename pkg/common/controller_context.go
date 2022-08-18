@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"time"
 
-	apiextinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/client-go/informers"
 )
 
@@ -22,7 +21,6 @@ func resyncPeriod() func() time.Duration {
 // ControllerContext stores all the informers for a variety of kubernetes objects.
 type ControllerContext struct {
 	ClientBuilder                 *Builder
-	APIExtInformerFactory         apiextinformers.SharedInformerFactory
 	KubeNamespacedInformerFactory informers.SharedInformerFactory
 
 	Stop <-chan struct{}
@@ -34,16 +32,11 @@ type ControllerContext struct {
 
 // CreateControllerContext creates the ControllerContext with the ClientBuilder.
 func CreateControllerContext(cb *Builder, stop <-chan struct{}, targetNamespace string) *ControllerContext {
-	apiExtClient := cb.APIExtClientOrDie("apiext-shared-informer")
-	apiExtSharedInformer := apiextinformers.NewSharedInformerFactoryWithOptions(apiExtClient, resyncPeriod()(),
-		apiextinformers.WithNamespace(targetNamespace))
-
 	kubeClient := cb.KubeClientOrDie("kube-shared-informer")
 	kubeNamespacedSharedInformer := informers.NewFilteredSharedInformerFactory(kubeClient, resyncPeriod()(), targetNamespace, nil)
 
 	return &ControllerContext{
 		ClientBuilder:                 cb,
-		APIExtInformerFactory:         apiExtSharedInformer,
 		KubeNamespacedInformerFactory: kubeNamespacedSharedInformer,
 		Stop:                          stop,
 		InformersStarted:              make(chan struct{}),

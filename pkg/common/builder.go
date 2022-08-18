@@ -3,7 +3,6 @@ package common
 import (
 	"os"
 
-	apiext "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -14,11 +13,6 @@ import (
 // with its embedded rest.Config.
 type Builder struct {
 	config *rest.Config
-}
-
-// APIExtClientOrDie returns the kubernetes client interface for extended kubernetes objects.
-func (cb *Builder) APIExtClientOrDie(name string) apiext.Interface {
-	return apiext.NewForConfigOrDie(rest.AddUserAgent(cb.config, name))
 }
 
 // KubeClientOrDie returns the kubernetes client interface for general kubernetes objects.

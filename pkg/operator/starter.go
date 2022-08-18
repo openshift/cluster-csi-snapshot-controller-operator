@@ -75,7 +75,10 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	staticResourcesController := staticresourcecontroller.NewStaticResourceController(
 		"CSISnapshotStaticResourceController",
 		assets.ReadFile,
-		[]string{},
+		[]string{
+			"volumesnapshots.yaml",
+			"volumesnapshotcontents.yaml",
+			"volumesnapshotclasses.yaml"},
 		(&resourceapply.ClientHolder{}).WithKubernetes(kubeClient),
 		operatorClient,
 		controllerConfig.EventRecorder,
@@ -114,8 +117,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	operator := NewCSISnapshotControllerOperator(
 		*operatorClient,
 		ctrlctx.KubeNamespacedInformerFactory.Core().V1().Nodes(),
-		ctrlctx.APIExtInformerFactory.Apiextensions().V1().CustomResourceDefinitions(),
-		ctrlctx.ClientBuilder.APIExtClientOrDie(targetName),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
 		configInformers.Config().V1().Infrastructures().Lister(),
 		kubeClient,
@@ -163,7 +164,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		csiConfigInformers,
 		configInformers,
 		kubeInformersForNamespaces,
-		ctrlctx.APIExtInformerFactory,         // CRDs
 		ctrlctx.KubeNamespacedInformerFactory, // operand Deployment
 	} {
 		informer.Start(ctx.Done())
