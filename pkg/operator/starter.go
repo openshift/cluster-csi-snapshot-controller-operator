@@ -114,7 +114,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		},
 	).AddKubeInformers(kubeInformersForNamespaces)
 
-	operator := NewCSISnapshotControllerOperator(
+	controller := NewCSISnapshotController(
+		"CSISnapshotController",
 		*operatorClient,
 		ctrlctx.KubeNamespacedInformerFactory.Core().V1().Nodes(),
 		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
@@ -181,8 +182,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	} {
 		go controller.Run(ctx, 1)
 	}
-	klog.Info("Starting the operator.")
-	go operator.Run(ctx, 1)
+	klog.Info("Starting the controller.")
+	go controller.Run(ctx, 1)
 
 	<-ctx.Done()
 

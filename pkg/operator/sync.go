@@ -37,7 +37,7 @@ func (a *AlphaCRDError) Error() string {
 	return fmt.Sprintf("cluster-csi-snapshot-controller-operator does not support v1alpha1 version of snapshot CRDs %s installed by user or 3rd party controller", strings.Join(a.alphaCRDs, ", "))
 }
 
-func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotController) (*appsv1.Deployment, error) {
+func (c *csiSnapshotController) syncDeployment(instance *operatorv1.CSISnapshotController) (*appsv1.Deployment, error) {
 	deploy, err := c.getExpectedDeployment(instance)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func (c *csiSnapshotOperator) syncDeployment(instance *operatorv1.CSISnapshotCon
 	return deploy, nil
 }
 
-func (c *csiSnapshotOperator) getExpectedDeployment(instance *operatorv1.CSISnapshotController) (*appsv1.Deployment, error) {
+func (c *csiSnapshotController) getExpectedDeployment(instance *operatorv1.CSISnapshotController) (*appsv1.Deployment, error) {
 	deploymentBytes, err := assets.ReadFile(deployment)
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func getLogLevel(logLevel operatorv1.LogLevel) int {
 	}
 }
 
-func (c *csiSnapshotOperator) syncStatus(instance *operatorv1.CSISnapshotController, deployment *appsv1.Deployment) error {
+func (c *csiSnapshotController) syncStatus(instance *operatorv1.CSISnapshotController, deployment *appsv1.Deployment) error {
 	c.syncConditions(instance, deployment)
 
 	resourcemerge.SetDeploymentGeneration(&instance.Status.Generations, deployment)
@@ -138,7 +138,7 @@ func (c *csiSnapshotOperator) syncStatus(instance *operatorv1.CSISnapshotControl
 	return nil
 }
 
-func (c *csiSnapshotOperator) syncConditions(instance *operatorv1.CSISnapshotController, deployment *appsv1.Deployment) {
+func (c *csiSnapshotController) syncConditions(instance *operatorv1.CSISnapshotController, deployment *appsv1.Deployment) {
 	// The operator does not have any prerequisites (at least now)
 	v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
 		operatorv1.OperatorCondition{
@@ -155,7 +155,7 @@ func (c *csiSnapshotOperator) syncConditions(instance *operatorv1.CSISnapshotCon
 	c.syncAvailableCondition(deployment, instance)
 }
 
-func (c *csiSnapshotOperator) syncAvailableCondition(deployment *appsv1.Deployment, instance *operatorv1.CSISnapshotController) {
+func (c *csiSnapshotController) syncAvailableCondition(deployment *appsv1.Deployment, instance *operatorv1.CSISnapshotController) {
 	// Available: at least one deployment pod is available, regardless at which version
 	if deployment != nil && deployment.Status.AvailableReplicas > 0 {
 		v1helpers.SetOperatorCondition(&instance.Status.OperatorStatus.Conditions,
@@ -174,7 +174,7 @@ func (c *csiSnapshotOperator) syncAvailableCondition(deployment *appsv1.Deployme
 	}
 }
 
-func (c *csiSnapshotOperator) syncProgressingCondition(instance *operatorv1.CSISnapshotController, deployment *appsv1.Deployment) {
+func (c *csiSnapshotController) syncProgressingCondition(instance *operatorv1.CSISnapshotController, deployment *appsv1.Deployment) {
 	// Progressing: true when Deployment has some work to do
 	// (false: when all replicas are updated to the latest release and available)/
 	var progressing operatorv1.ConditionStatus

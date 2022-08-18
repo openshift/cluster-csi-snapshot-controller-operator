@@ -3,22 +3,17 @@ package operator
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	configlisterv1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
+	"github.com/openshift/library-go/pkg/controller/factory"
 	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -40,27 +35,23 @@ const (
 	maxRetries = 15
 )
 
-type csiSnapshotOperator struct {
+type csiSnapshotController struct {
+	name          string
 	client        operatorclient.OperatorClient
 	kubeClient    kubernetes.Interface
 	versionGetter status.VersionGetter
 	eventRecorder events.Recorder
 
-	syncHandler func(context.Context) error
-
 	infraLister configlisterv1.InfrastructureLister
 	nodeLister  corelistersv1.NodeLister
-
-	queue workqueue.RateLimitingInterface
-
-	operatorContext context.Context
 
 	operatorVersion            string
 	operandVersion             string
 	csiSnapshotControllerImage string
 }
 
-func NewCSISnapshotControllerOperator(
+func NewCSISnapshotController(
+	name string,
 	client operatorclient.OperatorClient,
 	nodeInformer coreinformersv1.NodeInformer,
 	deployInformer appsinformersv1.DeploymentInformer,
@@ -71,42 +62,35 @@ func NewCSISnapshotControllerOperator(
 	operatorVersion string,
 	operandVersion string,
 	csiSnapshotControllerImage string,
-) *csiSnapshotOperator {
-	csiOperator := &csiSnapshotOperator{
+) factory.Controller {
+	c := &csiSnapshotController{
+		name:                       name,
 		client:                     client,
 		nodeLister:                 nodeInformer.Lister(),
 		kubeClient:                 kubeClient,
 		versionGetter:              versionGetter,
 		eventRecorder:              eventRecorder,
-		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshot-controller"),
 		operatorVersion:            operatorVersion,
 		operandVersion:             operandVersion,
 		csiSnapshotControllerImage: csiSnapshotControllerImage,
 		infraLister:                infraLister,
 	}
 
-	nodeInformer.Informer().AddEventHandler(csiOperator.eventHandler("node"))
-	deployInformer.Informer().AddEventHandler(csiOperator.eventHandler("deployment"))
-	client.Informer().AddEventHandler(csiOperator.eventHandler("csisnapshotcontroller"))
-
-	csiOperator.syncHandler = csiOperator.sync
-
-	return csiOperator
+	return factory.New().WithInformers(
+		nodeInformer.Informer(),
+		deployInformer.Informer(),
+		client.Informer(),
+	).WithSync(
+		c.sync,
+	).ResyncEvery(
+		time.Minute,
+	).ToController(
+		c.name,
+		eventRecorder.WithComponentSuffix(strings.ToLower(name)+"-deployment-controller-"),
+	)
 }
 
-func (c *csiSnapshotOperator) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
-	defer c.queue.ShutDown()
-
-	c.operatorContext = ctx
-
-	for i := 0; i < workers; i++ {
-		go wait.Until(c.worker, time.Second, ctx.Done())
-	}
-	<-ctx.Done()
-}
-
-func (c *csiSnapshotOperator) sync(ctx context.Context) error {
+func (c *csiSnapshotController) sync(ctx context.Context, syncContext factory.SyncContext) error {
 	instance, err := c.client.GetOperatorInstance()
 	if err != nil {
 		return err
@@ -160,7 +144,7 @@ func (c *csiSnapshotOperator) sync(ctx context.Context) error {
 	return syncErr
 }
 
-func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus, err error) {
+func (c *csiSnapshotController) updateSyncError(status *operatorv1.OperatorStatus, err error) {
 	if err != nil {
 		degradedReason := "OperatorSync"
 		v1helpers.SetOperatorCondition(&status.Conditions,
@@ -179,7 +163,7 @@ func (c *csiSnapshotOperator) updateSyncError(status *operatorv1.OperatorStatus,
 	}
 }
 
-func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotController) error {
+func (c *csiSnapshotController) handleSync(instance *operatorv1.CSISnapshotController) error {
 	deployment, err := c.syncDeployment(instance)
 	if err != nil {
 		return fmt.Errorf("failed to sync Deployments: %s", err)
@@ -190,87 +174,12 @@ func (c *csiSnapshotOperator) handleSync(instance *operatorv1.CSISnapshotControl
 	return nil
 }
 
-func (c *csiSnapshotOperator) setVersion(operandName, version string) {
+func (c *csiSnapshotController) setVersion(operandName, version string) {
 	if c.versionChanged(operandName, version) {
 		c.versionGetter.SetVersion(operandName, version)
 	}
 }
 
-func (c *csiSnapshotOperator) versionChanged(operandName, version string) bool {
+func (c *csiSnapshotController) versionChanged(operandName, version string) bool {
 	return c.versionGetter.GetVersions()[operandName] != version
-}
-
-func (c *csiSnapshotOperator) enqueue(obj interface{}) {
-	// we're filtering out config maps that are "leader" based and we don't have logic around them
-	// resyncing on these causes the operator to sync every 14s for no good reason
-	if cm, ok := obj.(*corev1.ConfigMap); ok && cm.GetAnnotations() != nil && cm.GetAnnotations()[resourcelock.LeaderElectionRecordAnnotationKey] != "" {
-		return
-	}
-	// Sync corresponding CSISnapshotController instance. Since there is only one, sync that one.
-	// It will check all other objects (Deployment) and update/overwrite them as needed.
-	c.queue.Add(operatorclient.GlobalConfigName)
-}
-
-func (c *csiSnapshotOperator) eventHandler(kind string) cache.ResourceEventHandler {
-	return cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			logInformerEvent(kind, obj, "added")
-			c.enqueue(obj)
-		},
-		UpdateFunc: func(old, new interface{}) {
-			logInformerEvent(kind, new, "updated")
-			c.enqueue(new)
-		},
-		DeleteFunc: func(obj interface{}) {
-			logInformerEvent(kind, obj, "deleted")
-			c.enqueue(obj)
-		},
-	}
-}
-
-func logInformerEvent(kind, obj interface{}, message string) {
-	if klog.V(6).Enabled() {
-		objMeta, err := meta.Accessor(obj)
-		if err != nil {
-			return
-		}
-		// "deployment csi-snapshot-controller updated"
-		klog.V(6).Infof("Received event: %s %s %s", kind, objMeta.GetName(), message)
-	}
-}
-
-func (c *csiSnapshotOperator) worker() {
-	for c.processNextWorkItem() {
-	}
-}
-
-func (c *csiSnapshotOperator) processNextWorkItem() bool {
-	key, quit := c.queue.Get()
-	if quit {
-		return false
-	}
-	defer c.queue.Done(key)
-
-	err := c.syncHandler(c.operatorContext)
-	c.handleErr(err, key)
-
-	return true
-}
-
-func (c *csiSnapshotOperator) handleErr(err error, key interface{}) {
-	if err == nil {
-		c.queue.Forget(key)
-		return
-	}
-
-	if c.queue.NumRequeues(key) < maxRetries {
-		klog.V(2).Infof("Error syncing operator %v: %v", key, err)
-		c.queue.AddRateLimited(key)
-		return
-	}
-
-	utilruntime.HandleError(err)
-	klog.V(2).Infof("Dropping operator %q out of the queue: %v", key, err)
-	c.queue.Forget(key)
-	c.queue.AddAfter(key, 1*time.Minute)
 }

@@ -16,6 +16,7 @@ import (
 	opinformers "github.com/openshift/client-go/operator/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
+	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
@@ -49,7 +50,7 @@ type operatorTest struct {
 }
 
 type testContext struct {
-	operator          *csiSnapshotOperator
+	controller        factory.Controller
 	coreClient        *fakecore.Clientset
 	coreInformers     coreinformers.SharedInformerFactory
 	operatorClient    *fakeop.Clientset
@@ -133,7 +134,9 @@ func newOperator(test operatorTest) *testContext {
 	versionGetter.SetVersion("csi-snapshot-controller", testVersion)
 
 	recorder := events.NewInMemoryRecorder("operator")
-	op := NewCSISnapshotControllerOperator(client,
+	ctrl := NewCSISnapshotController(
+		"foo",
+		client,
 		coreInformerFactory.Core().V1().Nodes(),
 		coreInformerFactory.Apps().V1().Deployments(),
 		configInformerFactory.Config().V1().Infrastructures().Lister(),
@@ -146,7 +149,7 @@ func newOperator(test operatorTest) *testContext {
 	)
 
 	return &testContext{
-		operator:          op,
+		controller:        ctrl,
 		coreClient:        coreClient,
 		coreInformers:     coreInformerFactory,
 		operatorClient:    operatorClient,
@@ -158,7 +161,7 @@ func newOperator(test operatorTest) *testContext {
 
 type csiSnapshotControllerModifier func(*opv1.CSISnapshotController) *opv1.CSISnapshotController
 
-func csiSnapshotController(modifiers ...csiSnapshotControllerModifier) *opv1.CSISnapshotController {
+func newCSISnapshotController(modifiers ...csiSnapshotControllerModifier) *opv1.CSISnapshotController {
 	instance := &opv1.CSISnapshotController{
 		TypeMeta: metav1.TypeMeta{APIVersion: opv1.SchemeGroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{
@@ -354,11 +357,11 @@ func TestSync(t *testing.T) {
 			name:  "initial sync",
 			image: defaultImage,
 			initialObjects: testObjects{
-				csiSnapshotController: csiSnapshotController(),
+				csiSnapshotController: newCSISnapshotController(),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 0)),
-				csiSnapshotController: csiSnapshotController(
+				csiSnapshotController: newCSISnapshotController(
 					withStatus(replica0),
 					withGenerations(1),
 					withTrueConditions(upgradeableCondition, preReqsCondition, progressingCondition),
@@ -371,11 +374,11 @@ func TestSync(t *testing.T) {
 			image: defaultImage,
 			initialObjects: testObjects{
 				deployment:            getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
-				csiSnapshotController: csiSnapshotController(withGenerations(1)),
+				csiSnapshotController: newCSISnapshotController(withGenerations(1)),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage, withDeploymentGeneration(1, 1), withDeploymentStatus(replica1, replica1, replica1)),
-				csiSnapshotController: csiSnapshotController(
+				csiSnapshotController: newCSISnapshotController(
 					withStatus(replica1),
 					withGenerations(1),
 					withTrueConditions(availableCondition, upgradeableCondition, preReqsCondition),
@@ -391,14 +394,14 @@ func TestSync(t *testing.T) {
 					withDeploymentReplicas(2),      // User changed replicas
 					withDeploymentGeneration(2, 1), // ... which changed Generation
 					withDeploymentStatus(replica1, replica1, replica1)),
-				csiSnapshotController: csiSnapshotController(withGenerations(1)), // the operator knows the old generation of the Deployment
+				csiSnapshotController: newCSISnapshotController(withGenerations(1)), // the operator knows the old generation of the Deployment
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentReplicas(1),      // The operator fixed replica count
 					withDeploymentGeneration(3, 1), // ... which bumps generation again
 					withDeploymentStatus(replica1, replica1, replica1)),
-				csiSnapshotController: csiSnapshotController(
+				csiSnapshotController: newCSISnapshotController(
 					withStatus(replica1),
 					withGenerations(3), // now the operator knows generation 1
 					withTrueConditions(availableCondition, upgradeableCondition, preReqsCondition, progressingCondition), // Progressing due to Generation change
@@ -413,7 +416,7 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // the Deployment has no pods
-				csiSnapshotController: csiSnapshotController(
+				csiSnapshotController: newCSISnapshotController(
 					withStatus(replica1),
 					withGenerations(1),
 					withGeneration(1, 1),
@@ -424,7 +427,7 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(0, 0, 0)), // No change to the Deployment
-				csiSnapshotController: csiSnapshotController(
+				csiSnapshotController: newCSISnapshotController(
 					withStatus(replica0),
 					withGenerations(1),
 					withGeneration(1, 1),
@@ -440,7 +443,7 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1 /*ready*/, 1 /*available*/, 0 /*updated*/)), // the Deployment is updating 1 pod
-				csiSnapshotController: csiSnapshotController(
+				csiSnapshotController: newCSISnapshotController(
 					withStatus(replica1),
 					withGenerations(1),
 					withGeneration(1, 1),
@@ -451,7 +454,7 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(1, 1, 0)), // No change to the Deployment
-				csiSnapshotController: csiSnapshotController(
+				csiSnapshotController: newCSISnapshotController(
 					withStatus(replica0),
 					withGenerations(1),
 					withGeneration(1, 1),
@@ -467,7 +470,7 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel2, defaultImage,
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
-				csiSnapshotController: csiSnapshotController(
+				csiSnapshotController: newCSISnapshotController(
 					withGenerations(1),
 					withLogLevel(opv1.Trace), // User changed the log level...
 					withGeneration(2, 1)),    //... which caused the Generation to increase
@@ -476,7 +479,7 @@ func TestSync(t *testing.T) {
 				deployment: getDeployment(argsLevel6, defaultImage, // The operator changed cmdline arguments with a new log level
 					withDeploymentGeneration(2, 1), // ... which caused the Generation to increase
 					withDeploymentStatus(replica1, replica1, replica1)),
-				csiSnapshotController: csiSnapshotController(
+				csiSnapshotController: newCSISnapshotController(
 					withStatus(replica1),
 					withLogLevel(opv1.Trace),
 					withGenerations(2),
@@ -500,7 +503,7 @@ func TestSync(t *testing.T) {
 					withDeploymentReplicas(1), // just 1 replica
 					withDeploymentGeneration(1, 1),
 					withDeploymentStatus(replica1, replica1, replica1)),
-				csiSnapshotController: csiSnapshotController(withGenerations(1)),
+				csiSnapshotController: newCSISnapshotController(withGenerations(1)),
 			},
 			expectedObjects: testObjects{
 				deployment: getDeployment(argsLevel2, defaultImage,
@@ -518,7 +521,7 @@ func TestSync(t *testing.T) {
 			ctx := newOperator(test)
 
 			// Act
-			err := ctx.operator.sync(context.TODO())
+			err := ctx.controller.Sync(context.TODO(), factory.NewSyncContext("foo", events.NewInMemoryRecorder("dummy-controller")))
 
 			// Assert
 			// Check error
