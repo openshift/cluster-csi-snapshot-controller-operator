@@ -11,7 +11,6 @@ import (
 	configinformerv1 "github.com/openshift/client-go/config/informers/externalversions/config/v1"
 	configlisterv1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
-	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operatorclient"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
@@ -34,7 +33,7 @@ import (
 )
 
 type csiSnapshotWebhookController struct {
-	client           operatorclient.OperatorClient
+	client           v1helpers.OperatorClient
 	kubeClient       kubernetes.Interface
 	nodeLister       corelistersv1.NodeLister
 	infraLister      configlisterv1.InfrastructureLister
@@ -68,7 +67,7 @@ func init() {
 
 // NewCSISnapshotWebhookController returns a controller that creates and manages Deployment with CSI snapshot webhook.
 func NewCSISnapshotWebhookController(
-	client operatorclient.OperatorClient,
+	client v1helpers.OperatorClient,
 	nodeInformer coreinformersv1.NodeInformer,
 	deployInformer appsinformersv1.DeploymentInformer,
 	webhookInformer admissionnformersv1.ValidatingWebhookConfigurationInformer,

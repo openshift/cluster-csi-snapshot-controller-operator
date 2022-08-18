@@ -32,9 +32,9 @@ spec:
             capabilities:
               drop:
                 - ALL
-          image: quay.io/k8scsi/snapshot-controller:v2.2.0-rc1
+          image: ${CONTROLLER_IMAGE}
           args:
-            - "--v=5"
+            - "--v=${LOG_LEVEL}"
             - "--leader-election=true"
             # Leader election values are from
             # https://github.com/openshift/library-go/blob/master/pkg/config/leaderelection/leaderelection.go
