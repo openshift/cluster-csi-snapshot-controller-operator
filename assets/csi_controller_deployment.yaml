@@ -32,7 +32,7 @@ spec:
             capabilities:
               drop:
                 - ALL
-          image: ${CONTROLLER_IMAGE}
+          image: ${OPERAND_IMAGE}
           args:
             - "--v=${LOG_LEVEL}"
             - "--leader-election=true"

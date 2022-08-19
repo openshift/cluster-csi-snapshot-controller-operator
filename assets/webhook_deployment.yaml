@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
       - name: webhook
-        image: ${WEBHOOK_IMAGE}
+        image: ${OPERAND_IMAGE}
         args:
           - --tls-cert-file=/etc/snapshot-validation-webhook/certs/tls.crt
           - --tls-private-key-file=/etc/snapshot-validation-webhook/certs/tls.key

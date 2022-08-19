@@ -79,7 +79,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		[]string{
 			"volumesnapshots.yaml",
 			"volumesnapshotcontents.yaml",
-			"volumesnapshotclasses.yaml"},
+			"volumesnapshotclasses.yaml",
+		},
 		resourceapply.NewKubeClientHolder(kubeClient).WithAPIExtensionsClient(apiExtClient),
 		operatorClient,
 		controllerConfig.EventRecorder,
@@ -115,13 +116,13 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		},
 	).AddKubeInformers(kubeInformersForNamespaces)
 
-	deploymentManifest, err := assets.ReadFile("csi_controller_deployment.yaml")
+	controllerDeploymentManifest, err := assets.ReadFile("csi_controller_deployment.yaml")
 	if err != nil {
 		return err
 	}
-	deploymentController := dc.NewDeploymentController(
+	controllerDeploymentController := dc.NewDeploymentController(
 		"CSISnapshotController",
-		deploymentManifest,
+		controllerDeploymentManifest,
 		controllerConfig.EventRecorder,
 		operatorClient,
 		kubeClient,
@@ -132,6 +133,32 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		},
 		[]dc.ManifestHookFunc{
 			replacePlaceholdersHook(os.Getenv(operandImageEnvName)),
+		},
+		csidrivercontrollerservicecontroller.WithControlPlaneTopologyHook(configInformers),
+		csidrivercontrollerservicecontroller.WithReplicasHook(
+			kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Lister(),
+		),
+	)
+
+	webhookDeploymentManifest, err := assets.ReadFile("webhook_deployment.yaml")
+	if err != nil {
+		return err
+	}
+	webhookDeploymentController := dc.NewDeploymentController(
+		// Name of this controller must match SISnapshotWebhookController from 4.11
+		// so it "adopts" its conditions during upgrade
+		"CSISnapshotWebhookController",
+		webhookDeploymentManifest,
+		controllerConfig.EventRecorder,
+		operatorClient,
+		kubeClient,
+		kubeInformersForNamespaces.InformersFor(operatorNamespace).Apps().V1().Deployments(),
+		[]factory.Informer{
+			kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
+			configInformers.Config().V1().Infrastructures().Informer(),
+		},
+		[]dc.ManifestHookFunc{
+			replacePlaceholdersHook(os.Getenv(webhookImageEnvName)),
 		},
 		csidrivercontrollerservicecontroller.WithControlPlaneTopologyHook(configInformers),
 		csidrivercontrollerservicecontroller.WithReplicasHook(
@@ -150,15 +177,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		os.Getenv(operandVersionEnvName),
 	)
 
-	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(
+	webhookController := webhookdeployment.NewCSISnapshotWebhookController(
 		operatorClient,
-		kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes(),
-		kubeInformersForNamespaces.InformersFor(operatorNamespace).Apps().V1().Deployments(),
 		kubeInformersForNamespaces.InformersFor(operatorNamespace).Admissionregistration().V1().ValidatingWebhookConfigurations(),
-		configInformers.Config().V1().Infrastructures(),
 		kubeClient,
 		controllerConfig.EventRecorder,
-		os.Getenv(webhookImageEnvName),
 	)
 
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
@@ -212,8 +235,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		logLevelController,
 		managementStateController,
 		staticResourcesController,
-		webhookOperator,
-		deploymentController,
+		webhookController,
+		controllerDeploymentController,
+		webhookDeploymentController,
 		versionController,
 		cndController,
 	} {
@@ -228,7 +252,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 func replacePlaceholdersHook(imageName string) dc.ManifestHookFunc {
 	return func(spec *operatorv1.OperatorSpec, manifest []byte) ([]byte, error) {
 		pairs := []string{
-			"${CONTROLLER_IMAGE}", imageName,
+			"${OPERAND_IMAGE}", imageName,
 		}
 		logLevel := loglevel.LogLevelToVerbosity(spec.LogLevel)
 		pairs = append(pairs, "${LOG_LEVEL}", fmt.Sprint(logLevel))
