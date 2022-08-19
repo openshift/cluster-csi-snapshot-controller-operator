@@ -12,7 +12,6 @@ import (
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformer "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
-	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operator/webhookdeployment"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
@@ -80,6 +79,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"volumesnapshots.yaml",
 			"volumesnapshotcontents.yaml",
 			"volumesnapshotclasses.yaml",
+			"webhook_config.yaml",
 		},
 		resourceapply.NewKubeClientHolder(kubeClient).WithAPIExtensionsClient(apiExtClient),
 		operatorClient,
@@ -177,13 +177,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		os.Getenv(operandVersionEnvName),
 	)
 
-	webhookController := webhookdeployment.NewCSISnapshotWebhookController(
-		operatorClient,
-		kubeInformersForNamespaces.InformersFor(operatorNamespace).Admissionregistration().V1().ValidatingWebhookConfigurations(),
-		kubeClient,
-		controllerConfig.EventRecorder,
-	)
-
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
 		targetName,
 		[]configv1.ObjectReference{
@@ -235,7 +228,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		logLevelController,
 		managementStateController,
 		staticResourcesController,
-		webhookController,
 		controllerDeploymentController,
 		webhookDeploymentController,
 		versionController,
