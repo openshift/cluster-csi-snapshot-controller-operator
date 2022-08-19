@@ -12,7 +12,6 @@ import (
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformer "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
-	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/common"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/pkg/operator/webhookdeployment"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -27,6 +26,9 @@ import (
 	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	kubeclient "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"k8s.io/klog/v2"
 )
@@ -45,18 +47,22 @@ const (
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
-	cb, err := common.NewBuilder("")
-	if err != nil {
-		klog.Fatalf("error creating clients: %v", err)
-	}
-	ctrlctx := common.CreateControllerContext(cb, ctx.Done(), targetNamespace)
-
-	configClient, err := configclient.NewForConfig(controllerConfig.KubeConfig)
+	kubeClient, err := kubeclient.NewForConfig(rest.AddUserAgent(controllerConfig.KubeConfig, targetName))
 	if err != nil {
 		return err
 	}
+	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, "", operatorNamespace, targetNamespace)
 
+	configClient, err := configclient.NewForConfig(rest.AddUserAgent(controllerConfig.KubeConfig, targetName))
+	if err != nil {
+		return err
+	}
 	configInformers := configinformer.NewSharedInformerFactoryWithOptions(configClient, resync)
+
+	apiExtClient, err := apiextclient.NewForConfig(rest.AddUserAgent(controllerConfig.KubeConfig, targetName))
+	if err != nil {
+		return err
+	}
 
 	// Create GenericOperatorclient. This is used by the library-go controllers created down below
 	gvr := operatorv1.SchemeGroupVersion.WithResource("csisnapshotcontrollers")
@@ -65,11 +71,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
-	kubeClient := ctrlctx.ClientBuilder.KubeClientOrDie(targetName)
-
 	versionGetter := status.NewVersionGetter()
 
-	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, operatorNamespace, targetNamespace)
 	staticResourcesController := staticresourcecontroller.NewStaticResourceController(
 		"CSISnapshotStaticResourceController",
 		assets.ReadFile,
@@ -77,7 +80,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"volumesnapshots.yaml",
 			"volumesnapshotcontents.yaml",
 			"volumesnapshotclasses.yaml"},
-		(&resourceapply.ClientHolder{}).WithKubernetes(kubeClient),
+		resourceapply.NewKubeClientHolder(kubeClient).WithAPIExtensionsClient(apiExtClient),
 		operatorClient,
 		controllerConfig.EventRecorder,
 	).WithConditionalResources(
@@ -122,9 +125,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controllerConfig.EventRecorder,
 		operatorClient,
 		kubeClient,
-		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
+		kubeInformersForNamespaces.InformersFor(operatorNamespace).Apps().V1().Deployments(),
 		[]factory.Informer{
-			ctrlctx.KubeNamespacedInformerFactory.Core().V1().Nodes().Informer(),
+			kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
 			configInformers.Config().V1().Infrastructures().Informer(),
 		},
 		[]dc.ManifestHookFunc{
@@ -149,9 +152,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	webhookOperator := webhookdeployment.NewCSISnapshotWebhookController(
 		operatorClient,
-		ctrlctx.KubeNamespacedInformerFactory.Core().V1().Nodes(),
-		ctrlctx.KubeNamespacedInformerFactory.Apps().V1().Deployments(),
-		ctrlctx.KubeNamespacedInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations(),
+		kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes(),
+		kubeInformersForNamespaces.InformersFor(operatorNamespace).Apps().V1().Deployments(),
+		kubeInformersForNamespaces.InformersFor(operatorNamespace).Admissionregistration().V1().ValidatingWebhookConfigurations(),
 		configInformers.Config().V1().Infrastructures(),
 		kubeClient,
 		controllerConfig.EventRecorder,
@@ -183,7 +186,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		dynamicInformers,
 		configInformers,
 		kubeInformersForNamespaces,
-		ctrlctx.KubeNamespacedInformerFactory, // operand Deployment
 	} {
 		informer.Start(ctx.Done())
 	}
