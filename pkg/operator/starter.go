@@ -175,6 +175,20 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controllerConfig.EventRecorder,
 	)
 
+	// This is the only controller that sets Upgradeable condition
+	cndController := NewConditionController(
+		"ConditionController",
+		operatorClient,
+		controllerConfig.EventRecorder,
+		[]operatorv1.OperatorCondition{
+			{
+				// The condition name should match the same condition in previous OCP release (4.11).
+				Type:   "CSISnapshotControllerUpgradeable",
+				Status: operatorv1.ConditionTrue,
+			},
+		},
+	)
+
 	logLevelController := loglevel.NewClusterOperatorLoggingController(operatorClient, controllerConfig.EventRecorder)
 	managementStateController := managementstatecontroller.NewOperatorManagementStateController(targetName, operatorClient, controllerConfig.EventRecorder)
 	management.SetOperatorNotRemovable()
@@ -201,6 +215,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		webhookOperator,
 		deploymentController,
 		versionController,
+		cndController,
 	} {
 		go controller.Run(ctx, 1)
 	}
