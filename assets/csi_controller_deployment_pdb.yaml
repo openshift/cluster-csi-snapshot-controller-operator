@@ -2,7 +2,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: csi-snapshot-controller-pdb
-  namespace: openshift-cluster-storage-operator
+  namespace: ${NAMESPACE}
 spec:
   maxUnavailable: 1
   selector:
