@@ -79,6 +79,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"volumesnapshots.yaml",
 			"volumesnapshotcontents.yaml",
 			"volumesnapshotclasses.yaml",
+			"serviceaccount.yaml",
 			"webhook_config.yaml",
 		},
 		resourceapply.NewKubeClientHolder(kubeClient).WithAPIExtensionsClient(apiExtClient),
