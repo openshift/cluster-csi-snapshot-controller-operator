@@ -13,4 +13,4 @@ spec:
   - name: csi-snapshot-validation-webhook
     from:
       kind: DockerImage
-      name: registry.svc.ci.openshift.org/ocp/4.7:csi-snapshot-validation-webhook
+      name: quay.io/openshift/origin-csi-snapshot-validation-webhook

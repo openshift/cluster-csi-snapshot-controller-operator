@@ -15,7 +15,6 @@ spec:
       app: csi-snapshot-controller-operator
   template:
     metadata:
-      name: csi-snapshot-controller-operator
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
@@ -35,13 +34,14 @@ spec:
           capabilities:
             drop:
             - ALL
-        args: [ "start", "-v", "5" , "--config=/var/run/configmaps/config/operator-config.yaml"]
+        args:
+        - start
+        - -v=2
         env:
         - name: OPERAND_IMAGE
           value: quay.io/openshift/origin-csi-snapshot-controller
         - name: WEBHOOK_IMAGE
-          # TODO: replace with quay.io image
-          value: registry.svc.ci.openshift.org/ocp/4.7:csi-snapshot-validation-webhook
+          value: quay.io/openshift/origin-csi-snapshot-validation-webhook
         - name: OPERATOR_IMAGE_VERSION
           value: "0.0.1-snapshot"
         - name: OPERAND_IMAGE_VERSION
@@ -51,14 +51,6 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - mountPath: /var/run/configmaps/config
-          name: config
-      volumes:
-      - name: config
-        configMap:
-          defaultMode: 440
-          name: csi-snapshot-controller-operator-config
       priorityClassName: "system-cluster-critical"
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -75,9 +67,6 @@ spec:
         operator: Exists
         effect: "NoSchedule"
       securityContext:
-        fsGroup: 10400
-        runAsGroup: 10400
         runAsNonRoot: true
-        runAsUser: 10400
         seccompProfile:
           type: RuntimeDefault
