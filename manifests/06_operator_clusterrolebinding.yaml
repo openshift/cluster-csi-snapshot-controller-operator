@@ -1,7 +1,8 @@
+# The operator needs to have all operand's RBACs to be able to grant them.
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-snapshot-controller-operator-role
+  name: csi-snapshot-controller-operator-clusterrole
   labels:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
@@ -15,4 +16,4 @@ subjects:
     namespace: openshift-cluster-storage-operator
 roleRef:
   kind: ClusterRole
-  name: cluster-admin
+  name: csi-snapshot-controller-operator-clusterrole
