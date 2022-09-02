@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
+    capability.openshift.io/name: CSISnapshot
     include.release.openshift.io/ibm-cloud-managed: "true"
   labels:
     app: csi-snapshot-controller-operator
