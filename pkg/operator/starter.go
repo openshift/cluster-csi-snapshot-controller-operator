@@ -58,7 +58,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
-	operandNamespace := defaultOperandNamespace
+	controlPlaneNamespace := defaultOperandNamespace
 	// Guest kubeconfig is the same as the management cluster one unless guestKubeConfigFile is provided
 	guestKubeClient := controlPlaneKubeClient
 	guestKubeConfig := controlPlaneKubeConfig
@@ -67,11 +67,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		if err != nil {
 			return fmt.Errorf("failed to use guest kubeconfig %s: %s", guestKubeConfigFile, err)
 		}
-		operandNamespace = controllerConfig.OperatorNamespace
+		controlPlaneNamespace = controllerConfig.OperatorNamespace
 		guestKubeClient = kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, targetName))
 	}
 
-	controlPlaneInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, "", operandNamespace)
+	controlPlaneInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, "", controlPlaneNamespace)
 	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient, "", defaultOperandNamespace)
 
 	// config.openshift.io client - use the guest cluster (Infrastructure)
@@ -97,7 +97,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	versionGetter := status.NewVersionGetter()
 
-	namespacedAssetFunc := namespaceReplacer(assets.ReadFile, operandNamespace)
+	namespacedAssetFunc := namespaceReplacer(assets.ReadFile, "${CONTROLPLANE_NAMESPACE}", controlPlaneNamespace)
 	guestStaticResourceController := staticresourcecontroller.NewStaticResourceController(
 		"CSISnapshotGuestStaticResourceController",
 		namespacedAssetFunc,
@@ -185,7 +185,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	var deploymentHooks []dc.DeploymentHookFunc
 	if isHyperShift {
 		deploymentHooks = []dc.DeploymentHookFunc{
-			hyperShiftReplaceNamespaceHook(operandNamespace),
+			hyperShiftReplaceNamespaceHook(controlPlaneNamespace),
 			hyperShiftRemoveNodeSelector(),
 			hyperShiftAddKubeConfigVolume("admin-kubeconfig"), // TODO: use dedicated secret for Snapshots
 		}
@@ -204,7 +204,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controllerConfig.EventRecorder,
 		guestOperatorClient,
 		controlPlaneKubeClient,
-		controlPlaneInformersForNamespaces.InformersFor(operandNamespace).Apps().V1().Deployments(),
+		controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Apps().V1().Deployments(),
 		[]factory.Informer{
 			guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
 			guestConfigInformers.Config().V1().Infrastructures().Informer(),
@@ -227,7 +227,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controllerConfig.EventRecorder,
 		guestOperatorClient,
 		controlPlaneKubeClient,
-		controlPlaneInformersForNamespaces.InformersFor(operandNamespace).Apps().V1().Deployments(),
+		controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Apps().V1().Deployments(),
 		[]factory.Informer{
 			guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
 			guestConfigInformers.Config().V1().Infrastructures().Informer(),
@@ -393,13 +393,13 @@ func hyperShiftSetWebhookService() validatingWebhookConfigHook {
 	}
 }
 
-func namespaceReplacer(assetFunc resourceapply.AssetFunc, namespace string) resourceapply.AssetFunc {
+func namespaceReplacer(assetFunc resourceapply.AssetFunc, placeholder, namespace string) resourceapply.AssetFunc {
 	return func(name string) ([]byte, error) {
 		asset, err := assetFunc(name)
 		if err != nil {
 			return asset, err
 		}
-		asset = bytes.ReplaceAll(asset, []byte("${NAMESPACE}"), []byte(namespace))
+		asset = bytes.ReplaceAll(asset, []byte(placeholder), []byte(namespace))
 		return asset, nil
 	}
 }

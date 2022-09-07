@@ -2,7 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: csi-snapshot-webhook
-  namespace: ${NAMESPACE}
+  namespace: ${CONTROLPLANE_NAMESPACE}
 spec:
   serviceName: "csi-snapshot-webhook"
   selector:
