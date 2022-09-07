@@ -53,15 +53,15 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	isHyperShift := guestKubeConfigFile != ""
 	// Kubeconfig received through service account or --kubeconfig arg
 	// is for the management cluster.
-	managementKubeConfig := controllerConfig.KubeConfig
-	managementKubeClient, err := kubeclient.NewForConfig(rest.AddUserAgent(managementKubeConfig, targetName))
+	controlPlaneKubeConfig := controllerConfig.KubeConfig
+	controlPlaneKubeClient, err := kubeclient.NewForConfig(rest.AddUserAgent(controlPlaneKubeConfig, targetName))
 	if err != nil {
 		return err
 	}
 	operandNamespace := defaultOperandNamespace
 	// Guest kubeconfig is the same as the management cluster one unless guestKubeConfigFile is provided
-	guestKubeClient := managementKubeClient
-	guestKubeConfig := managementKubeConfig
+	guestKubeClient := controlPlaneKubeClient
+	guestKubeConfig := controlPlaneKubeConfig
 	if isHyperShift {
 		guestKubeConfig, err = client.GetKubeConfigOrInClusterConfig(guestKubeConfigFile, nil)
 		if err != nil {
@@ -71,7 +71,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestKubeClient = kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, targetName))
 	}
 
-	managementKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(managementKubeClient, "", operandNamespace)
+	controlPlaneInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, "", operandNamespace)
 	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient, "", defaultOperandNamespace)
 
 	// config.openshift.io client - use the guest cluster (Infrastructure)
@@ -111,14 +111,14 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controllerConfig.EventRecorder,
 	)
 
-	mgmtStaticResourcesController := staticresourcecontroller.NewStaticResourceController(
-		"CSISnapshotPDBStaticResourceController",
+	controlPlaneStaticResourcesController := staticresourcecontroller.NewStaticResourceController(
+		"CSISnapshotStaticResourceController",
 		namespacedAssetFunc,
 		[]string{
 			"serviceaccount.yaml",
 			"webhook_service.yaml",
 		},
-		resourceapply.NewKubeClientHolder(managementKubeClient),
+		resourceapply.NewKubeClientHolder(controlPlaneKubeClient),
 		guestOperatorClient,
 		controllerConfig.EventRecorder,
 	).WithConditionalResources(
@@ -158,7 +158,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			}
 			return isSNO
 		},
-	).AddKubeInformers(managementKubeInformersForNamespaces)
+	).AddKubeInformers(controlPlaneInformersForNamespaces)
 
 	controllerDeploymentManifest, err := namespacedAssetFunc("csi_controller_deployment.yaml")
 	if err != nil {
@@ -203,8 +203,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		controllerDeploymentManifest,
 		controllerConfig.EventRecorder,
 		guestOperatorClient,
-		managementKubeClient,
-		managementKubeInformersForNamespaces.InformersFor(operandNamespace).Apps().V1().Deployments(),
+		controlPlaneKubeClient,
+		controlPlaneInformersForNamespaces.InformersFor(operandNamespace).Apps().V1().Deployments(),
 		[]factory.Informer{
 			guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
 			guestConfigInformers.Config().V1().Infrastructures().Informer(),
@@ -226,8 +226,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		webhookDeploymentManifest,
 		controllerConfig.EventRecorder,
 		guestOperatorClient,
-		managementKubeClient,
-		managementKubeInformersForNamespaces.InformersFor(operandNamespace).Apps().V1().Deployments(),
+		controlPlaneKubeClient,
+		controlPlaneInformersForNamespaces.InformersFor(operandNamespace).Apps().V1().Deployments(),
 		[]factory.Informer{
 			guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
 			guestConfigInformers.Config().V1().Infrastructures().Informer(),
@@ -286,7 +286,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}{
 		dynamicInformers,
 		guestConfigInformers,
-		managementKubeInformersForNamespaces,
+		controlPlaneInformersForNamespaces,
 		guestKubeInformersForNamespaces,
 	} {
 		informer.Start(ctx.Done())
@@ -304,7 +304,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		versionController,
 		cndController,
 		guestStaticResourceController,
-		mgmtStaticResourcesController,
+		controlPlaneStaticResourcesController,
 		webhookController,
 	} {
 		if controller != nil {
