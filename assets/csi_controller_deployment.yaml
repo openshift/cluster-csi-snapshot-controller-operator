@@ -5,6 +5,9 @@ metadata:
   namespace: ${CONTROLPLANE_NAMESPACE}
 spec:
   serviceName: "csi-snapshot-controller"
+  # Replicas for HyperShift. On standalone OCP it will be adjusted according to nr. of master nodes.
+  # TODO: adjust according to HostedControlPlane.Spec.AvailabilityPolicy.
+  replicas: 1
   selector:
     matchLabels:
       app: csi-snapshot-controller
