@@ -58,7 +58,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
-	controlPlaneNamespace := guestNamespace
+	controlPlaneNamespace := controllerConfig.OperatorNamespace
 	// Guest kubeconfig is the same as the management cluster one unless guestKubeConfigFile is provided
 	guestKubeClient := controlPlaneKubeClient
 	guestKubeConfig := controlPlaneKubeConfig
@@ -67,7 +67,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		if err != nil {
 			return fmt.Errorf("failed to use guest kubeconfig %s: %s", guestKubeConfigFile, err)
 		}
-		controlPlaneNamespace = controllerConfig.OperatorNamespace
 		guestKubeClient = kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, targetName))
 	}
 
