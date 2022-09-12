@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
+	"github.com/openshift/library-go/pkg/operator/events"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
@@ -58,6 +59,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
+
+	eventRecorder := controllerConfig.EventRecorder
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
 	// Guest kubeconfig is the same as the management cluster one unless guestKubeConfigFile is provided
 	guestKubeClient := controlPlaneKubeClient
@@ -68,6 +71,16 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			return fmt.Errorf("failed to use guest kubeconfig %s: %s", guestKubeConfigFile, err)
 		}
 		guestKubeClient = kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, targetName))
+
+		// Create all events in the guest cluster.
+		// Use name of the operator Deployment in the mgmt cluster + namespace in the guest cluster as the closest
+		// approximation of the real involvedObject.
+		controllerRef, err := events.GetControllerReferenceForCurrentPod(ctx, controlPlaneKubeClient, controlPlaneNamespace, nil)
+		controllerRef.Namespace = guestNamespace
+		if err != nil {
+			klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
+		}
+		eventRecorder = events.NewKubeRecorder(guestKubeClient.CoreV1().Events(guestNamespace), targetName, controllerRef)
 	}
 
 	controlPlaneInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, "", controlPlaneNamespace)
@@ -107,7 +120,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		},
 		resourceapply.NewKubeClientHolder(guestKubeClient).WithAPIExtensionsClient(guestAPIExtClient),
 		guestOperatorClient,
-		controllerConfig.EventRecorder,
+		eventRecorder,
 	)
 
 	controlPlaneStaticResourcesController := staticresourcecontroller.NewStaticResourceController(
@@ -119,7 +132,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		},
 		resourceapply.NewKubeClientHolder(controlPlaneKubeClient),
 		guestOperatorClient,
-		controllerConfig.EventRecorder,
+		eventRecorder,
 	).WithConditionalResources(
 		// Deploy PDBs everywhere except SNO
 		namespacedAssetFunc,
@@ -177,7 +190,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestKubeInformersForNamespaces.InformersFor("").Admissionregistration().V1().ValidatingWebhookConfigurations(),
 		namespacedAssetFunc,
 		"webhook_config.yaml",
-		controllerConfig.EventRecorder,
+		eventRecorder,
 		webhookHooks,
 	)
 
@@ -200,7 +213,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	controllerDeploymentController := dc.NewDeploymentController(
 		"CSISnapshotController",
 		controllerDeploymentManifest,
-		controllerConfig.EventRecorder,
+		eventRecorder,
 		guestOperatorClient,
 		controlPlaneKubeClient,
 		controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Apps().V1().Deployments(),
@@ -223,7 +236,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		// so it "adopts" its conditions during upgrade
 		"CSISnapshotWebhookController",
 		webhookDeploymentManifest,
-		controllerConfig.EventRecorder,
+		eventRecorder,
 		guestOperatorClient,
 		controlPlaneKubeClient,
 		controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Apps().V1().Deployments(),
@@ -241,7 +254,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		"VersionController",
 		guestOperatorClient,
 		versionGetter,
-		controllerConfig.EventRecorder,
+		eventRecorder,
 		"CSISnapshotControllerAvailable",
 		"CSISnapshotControllerProgressing",
 		os.Getenv(operatorVersionEnvName),
@@ -258,14 +271,14 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestConfigInformers.Config().V1().ClusterOperators(),
 		guestOperatorClient,
 		versionGetter,
-		controllerConfig.EventRecorder,
+		eventRecorder,
 	)
 
 	// This is the only controller that sets Upgradeable condition
 	cndController := NewConditionController(
 		"ConditionController",
 		guestOperatorClient,
-		controllerConfig.EventRecorder,
+		eventRecorder,
 		[]operatorv1.OperatorCondition{
 			{
 				// The condition name should match the same condition in previous OCP release (4.11).
@@ -275,8 +288,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		},
 	)
 
-	logLevelController := loglevel.NewClusterOperatorLoggingController(guestOperatorClient, controllerConfig.EventRecorder)
-	managementStateController := managementstatecontroller.NewOperatorManagementStateController(targetName, guestOperatorClient, controllerConfig.EventRecorder)
+	logLevelController := loglevel.NewClusterOperatorLoggingController(guestOperatorClient, eventRecorder)
+	managementStateController := managementstatecontroller.NewOperatorManagementStateController(targetName, guestOperatorClient, eventRecorder)
 	management.SetOperatorNotRemovable()
 
 	klog.Info("Starting the Informers.")
