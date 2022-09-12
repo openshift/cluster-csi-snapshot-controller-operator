@@ -38,8 +38,8 @@ import (
 )
 
 const (
-	targetName              = "csi-snapshot-controller"
-	defaultOperandNamespace = "openshift-cluster-storage-operator"
+	targetName     = "csi-snapshot-controller"
+	guestNamespace = "openshift-cluster-storage-operator"
 
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
@@ -58,7 +58,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
-	controlPlaneNamespace := defaultOperandNamespace
+	controlPlaneNamespace := guestNamespace
 	// Guest kubeconfig is the same as the management cluster one unless guestKubeConfigFile is provided
 	guestKubeClient := controlPlaneKubeClient
 	guestKubeConfig := controlPlaneKubeConfig
@@ -72,7 +72,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}
 
 	controlPlaneInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, "", controlPlaneNamespace)
-	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient, "", defaultOperandNamespace)
+	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient, "", guestNamespace)
 
 	// config.openshift.io client - use the guest cluster (Infrastructure)
 	guestConfigClient, err := configclient.NewForConfig(rest.AddUserAgent(guestKubeConfig, targetName))
@@ -252,7 +252,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
 		targetName,
 		[]configv1.ObjectReference{
-			{Resource: "namespaces", Name: defaultOperandNamespace},
+			{Resource: "namespaces", Name: guestNamespace},
 			{Group: operatorv1.GroupName, Resource: "csisnapshotcontrollers", Name: "cluster"},
 		},
 		guestConfigClient.ConfigV1(),
