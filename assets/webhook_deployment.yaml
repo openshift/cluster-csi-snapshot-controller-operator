@@ -2,7 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: csi-snapshot-webhook
-  namespace: openshift-cluster-storage-operator
+  namespace: ${CONTROLPLANE_NAMESPACE}
 spec:
   serviceName: "csi-snapshot-webhook"
   selector:
@@ -34,6 +34,7 @@ spec:
           - name: certs
             mountPath: /etc/snapshot-validation-webhook/certs
             readOnly: true
+            optional: true
         imagePullPolicy: IfNotPresent
         resources:
           requests:

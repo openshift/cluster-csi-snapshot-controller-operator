@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -18,6 +19,10 @@ func main() {
 	os.Exit(code)
 }
 
+var (
+	guestKubeconfig *string
+)
+
 func NewCSISnapshotControllerOperatorCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "csi-snapshot-controller-operator",
@@ -28,11 +33,16 @@ func NewCSISnapshotControllerOperatorCommand() *cobra.Command {
 		},
 	}
 
-	cmd2 := controllercmd.NewControllerCommandConfig("csi-snapshot-controller-operator", version.Get(), operator.RunOperator).NewCommand()
+	cmd2 := controllercmd.NewControllerCommandConfig("csi-snapshot-controller-operator", version.Get(), runOperatorWithGuestKubeconfig).NewCommand()
 	cmd2.Use = "start"
 	cmd2.Short = "Start the CSI Snapshot Controller Operator"
+	guestKubeconfig = cmd2.Flags().String("guest-kubeconfig", "", "Path to the guest kubeconfig file. This flag enables hypershift integration.")
 
 	cmd.AddCommand(cmd2)
 
 	return cmd
+}
+
+func runOperatorWithGuestKubeconfig(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
+	return operator.RunOperator(ctx, controllerConfig, *guestKubeconfig)
 }
