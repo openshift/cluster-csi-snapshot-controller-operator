@@ -63,7 +63,7 @@ spec:
                   matchLabels:
                     app: csi-snapshot-controller
                 topologyKey: kubernetes.io/hostname
-      priorityClassName: "system-cluster-critical"
+      priorityClassName: ${PRIORITY_CLASS}
       nodeSelector:
         node-role.kubernetes.io/master: ""
       tolerations:

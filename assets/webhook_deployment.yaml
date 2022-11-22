@@ -54,7 +54,7 @@ spec:
                   matchLabels:
                     app: csi-snapshot-webhook
                 topologyKey: kubernetes.io/hostname
-      priorityClassName: "system-cluster-critical"
+      priorityClassName: ${PRIORITY_CLASS}
       restartPolicy: Always
       securityContext:
         runAsNonRoot: true
