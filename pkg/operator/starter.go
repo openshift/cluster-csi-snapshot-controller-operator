@@ -47,6 +47,9 @@ const (
 	operandImageEnvName    = "OPERAND_IMAGE"
 	webhookImageEnvName    = "WEBHOOK_IMAGE"
 
+	defaultPriorityClass    = "system-cluster-critical"
+	hypershiftPriorityClass = "hypershift-control-plane"
+
 	resync = 20 * time.Minute
 )
 
@@ -194,8 +197,10 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		webhookHooks,
 	)
 
+	priorityClass := defaultPriorityClass
 	var deploymentHooks []dc.DeploymentHookFunc
 	if isHyperShift {
+		priorityClass = hypershiftPriorityClass
 		deploymentHooks = []dc.DeploymentHookFunc{
 			hyperShiftReplaceNamespaceHook(controlPlaneNamespace),
 			hyperShiftRemoveNodeSelector(),
@@ -222,7 +227,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			guestConfigInformers.Config().V1().Infrastructures().Informer(),
 		},
 		[]dc.ManifestHookFunc{
-			replacePlaceholdersHook(os.Getenv(operandImageEnvName)),
+			replacePlaceholdersHook(os.Getenv(operandImageEnvName), priorityClass),
 		},
 		deploymentHooks...,
 	)
@@ -245,7 +250,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			guestConfigInformers.Config().V1().Infrastructures().Informer(),
 		},
 		[]dc.ManifestHookFunc{
-			replacePlaceholdersHook(os.Getenv(webhookImageEnvName)),
+			replacePlaceholdersHook(os.Getenv(webhookImageEnvName), priorityClass),
 		},
 		deploymentHooks...,
 	)
@@ -329,10 +334,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	return fmt.Errorf("stopped")
 }
 
-func replacePlaceholdersHook(imageName string) dc.ManifestHookFunc {
+func replacePlaceholdersHook(imageName, priorityClass string) dc.ManifestHookFunc {
 	return func(spec *operatorv1.OperatorSpec, manifest []byte) ([]byte, error) {
 		pairs := []string{
 			"${OPERAND_IMAGE}", imageName,
+			"${PRIORITY_CLASS}", priorityClass,
 		}
 		logLevel := loglevel.LogLevelToVerbosity(spec.LogLevel)
 		pairs = append(pairs, "${LOG_LEVEL}", fmt.Sprint(logLevel))
