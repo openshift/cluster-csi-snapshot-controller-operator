@@ -156,19 +156,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			return !isSNO
 		},
 		func() bool {
-			if isHyperShift {
-				return false
-			}
-			isSNO, precheckSucceeded, err := staticcontrollercommon.NewIsSingleNodePlatformFn(guestConfigInformers.Config().V1().Infrastructures())()
-			if err != nil {
-				klog.Errorf("NewIsSingleNodePlatformFn failed: %v", err)
-				return false
-			}
-			if !precheckSucceeded {
-				klog.V(4).Infof("NewIsSingleNodePlatformFn precheck did not succeed, skipping")
-				return false
-			}
-			return isSNO
+			return false
 		},
 	).AddKubeInformers(controlPlaneInformersForNamespaces)
 
