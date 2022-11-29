@@ -14,5 +14,6 @@ subjects:
   - kind: ServiceAccount
     name: csi-snapshot-controller-operator
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: csi-snapshot-controller-operator-role

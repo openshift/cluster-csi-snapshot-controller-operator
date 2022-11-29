@@ -15,5 +15,6 @@ subjects:
     name: csi-snapshot-controller-operator
     namespace: openshift-cluster-storage-operator
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: csi-snapshot-controller-operator-clusterrole
