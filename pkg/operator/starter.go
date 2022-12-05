@@ -187,7 +187,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		deploymentHooks = []dc.DeploymentHookFunc{
 			hyperShiftReplaceNamespaceHook(controlPlaneNamespace),
 			hyperShiftRemoveNodeSelector(),
-			hyperShiftAddKubeConfigVolume("admin-kubeconfig"), // TODO: use dedicated secret for Snapshots
+			hyperShiftAddKubeConfigVolume("service-network-admin-kubeconfig"), // TODO: use dedicated secret for Snapshots
 		}
 	} else {
 		// Standalone OCP
