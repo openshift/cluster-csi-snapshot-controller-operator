@@ -3,7 +3,7 @@ module github.com/openshift/cluster-csi-snapshot-controller-operator
 go 1.19
 
 require (
-	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.0.1
+	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0
 	github.com/openshift/api v0.0.0-20230120195050-6ba31fa438f2
 	github.com/openshift/build-machinery-go v0.0.0-20220913142420-e25cf57ea46d
 	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
