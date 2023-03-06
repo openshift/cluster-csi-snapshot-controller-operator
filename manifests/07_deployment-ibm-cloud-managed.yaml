@@ -54,6 +54,7 @@ spec:
       priorityClassName: system-cluster-critical
       securityContext:
         runAsNonRoot: true
+        runAsUser: 11412
         seccompProfile:
           type: RuntimeDefault
       serviceAccountName: csi-snapshot-controller-operator

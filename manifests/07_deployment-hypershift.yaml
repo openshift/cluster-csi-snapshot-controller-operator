@@ -53,6 +53,7 @@ spec:
           name: guest-kubeconfig
       securityContext:
         runAsNonRoot: true
+        runAsUser: 11412
         seccompProfile:
           type: RuntimeDefault
       serviceAccountName: csi-snapshot-controller-operator

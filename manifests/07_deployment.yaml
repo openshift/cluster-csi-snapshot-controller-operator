@@ -69,5 +69,9 @@ spec:
         effect: "NoSchedule"
       securityContext:
         runAsNonRoot: true
+        # Force a specific UID, just in case this Pod matches a custom SCC with "runAsUser: type: runAsNonRoot".
+        # The UID value is UID of cluster-storage-operator + 1
+        # In 4.13, we have proper RBACs for the operator and explicit UID is not needed there.
+        runAsUser: 11412
         seccompProfile:
           type: RuntimeDefault
