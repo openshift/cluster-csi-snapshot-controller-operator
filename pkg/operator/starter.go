@@ -47,8 +47,9 @@ const (
 	operandImageEnvName    = "OPERAND_IMAGE"
 	webhookImageEnvName    = "WEBHOOK_IMAGE"
 
-	defaultPriorityClass    = "system-cluster-critical"
-	hypershiftPriorityClass = "hypershift-control-plane"
+	defaultPriorityClass     = "system-cluster-critical"
+	hypershiftPriorityClass  = "hypershift-control-plane"
+	hyperShiftPullSecretName = "pull-secret"
 
 	resync = 20 * time.Minute
 )
@@ -193,6 +194,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			hyperShiftReplaceNamespaceHook(controlPlaneNamespace),
 			hyperShiftRemoveNodeSelector(),
 			hyperShiftAddKubeConfigVolume("service-network-admin-kubeconfig"), // TODO: use dedicated secret for Snapshots
+			hyperShiftAddPullSecret(),
 		}
 	} else {
 		// Standalone OCP
@@ -395,6 +397,19 @@ func hyperShiftSetWebhookService() validatingWebhookConfigHook {
 			webhook.ClientConfig.URL = &url
 		}
 
+		return nil
+	}
+}
+
+func hyperShiftAddPullSecret() dc.DeploymentHookFunc {
+	return func(_ *operatorv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		if deployment.Spec.Template.Spec.ImagePullSecrets == nil {
+			deployment.Spec.Template.Spec.ImagePullSecrets = []v1.LocalObjectReference{}
+		}
+		pullSecretRef := v1.LocalObjectReference{
+			Name: hyperShiftPullSecretName,
+		}
+		deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, pullSecretRef)
 		return nil
 	}
 }
