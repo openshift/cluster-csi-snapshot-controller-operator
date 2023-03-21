@@ -33,14 +33,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/klog/v2"
 )
@@ -74,7 +75,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
-	controlPlaneDynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(controlPlaneDynamicClient, 12*time.Hour)
 
 	eventRecorder := controllerConfig.EventRecorder
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
@@ -100,6 +100,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}
 
 	controlPlaneInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, "", controlPlaneNamespace)
+	controlPlaneDynamicInformers := dynamicinformer.NewFilteredDynamicSharedInformerFactory(controlPlaneDynamicClient, resync, controlPlaneNamespace, nil)
 	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient, "", guestNamespace)
 
 	// config.openshift.io client - use the guest cluster (Infrastructure)
@@ -200,15 +201,31 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	priorityClass := defaultPriorityClass
 	var deploymentHooks []dc.DeploymentHookFunc
+	deploymentInformers := []factory.Informer{
+		guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
+		guestConfigInformers.Config().V1().Infrastructures().Informer(),
+	}
+
 	if isHyperShift {
 		priorityClass = hypershiftPriorityClass
+
+		// Create HostedControlPlane informer
+		hcpGVR := schema.GroupVersionResource{
+			Group:    "hypershift.openshift.io",
+			Version:  "v1beta1",
+			Resource: "hostedcontrolplanes",
+		}
+		hcpInformer := controlPlaneDynamicInformers.ForResource(hcpGVR)
+		deploymentInformers = append(deploymentInformers, hcpInformer.Informer())
+
 		deploymentHooks = []dc.DeploymentHookFunc{
 			hyperShiftReplaceNamespaceHook(controlPlaneNamespace),
 			hyperShiftAddKubeConfigVolume("service-network-admin-kubeconfig"), // TODO: use dedicated secret for Snapshots
 			hyperShiftControlPlaneIsolationHook(controlPlaneNamespace),
 			hyperShiftColocationHook(controlPlaneNamespace),
-			hyperShiftNodeSelectorHook(controlPlaneDynamicInformers, controlPlaneNamespace),
+			hyperShiftNodeSelectorHook(hcpInformer.Lister(), controlPlaneNamespace),
 		}
+
 	} else {
 		// Standalone OCP
 		deploymentHooks = []dc.DeploymentHookFunc{
@@ -225,10 +242,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestOperatorClient,
 		controlPlaneKubeClient,
 		controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Apps().V1().Deployments(),
-		[]factory.Informer{
-			guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
-			guestConfigInformers.Config().V1().Infrastructures().Informer(),
-		},
+		deploymentInformers,
 		[]dc.ManifestHookFunc{
 			replacePlaceholdersHook(os.Getenv(operandImageEnvName), priorityClass),
 		},
@@ -352,41 +366,50 @@ func replacePlaceholdersHook(imageName, priorityClass string) dc.ManifestHookFun
 	}
 }
 
-func hyperShiftNodeSelectorHook(dynamicInformers dynamicinformer.DynamicSharedInformerFactory, controlPlaneNamespace string) dc.DeploymentHookFunc {
+func hyperShiftNodeSelectorHook(hcpLister cache.GenericLister, controlPlaneNamespace string) dc.DeploymentHookFunc {
 	return func(_ *operatorv1.OperatorSpec, d *appsv1.Deployment) error {
-		// First we make sure the selector starts empty
-		d.Spec.Template.Spec.NodeSelector = map[string]string{}
-
-		// Try to get the node selectors from the HCP resource
-		hcpGVR := schema.GroupVersionResource{
-			Group:    "hypershift.openshift.io",
-			Version:  "v1beta1",
-			Resource: "hostedcontrolplanes",
-		}
-		informer := dynamicInformers.ForResource(hcpGVR)
-
-		// TODO: how to find out the name?
-		uncastInstance, err := informer.Lister().Get("hypershift-fbertina")
-		if apierrors.IsNotFound(err) {
-			// Not Hypershift?
-			return nil
-		}
+		nodeSelector, err := getHostedControlPlaneNodeSelector(hcpLister, controlPlaneNamespace)
 		if err != nil {
 			return err
 		}
-		instance := uncastInstance.(*unstructured.Unstructured)
-
-		nodeSelector, exists, err := unstructured.NestedStringMap(instance.UnstructuredContent(), "spec", "nodeSelector")
-		if !exists {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-
 		d.Spec.Template.Spec.NodeSelector = nodeSelector
 		return nil
 	}
+}
+
+func getHostedControlPlaneNodeSelector(hostedControlPlaneLister cache.GenericLister, namespace string) (map[string]string, error) {
+	hcp, err := getHostedControlPlane(hostedControlPlaneLister, namespace)
+	if err != nil {
+		return nil, err
+	}
+	nodeSelector, exists, err := unstructured.NestedStringMap(hcp.UnstructuredContent(), "spec", "nodeSelector")
+	if !exists {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	klog.V(4).Infof("Using node selector %v", nodeSelector)
+	return nodeSelector, nil
+}
+
+func getHostedControlPlane(hostedControlPlaneLister cache.GenericLister, namespace string) (*unstructured.Unstructured, error) {
+	list, err := hostedControlPlaneLister.ByNamespace(namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, fmt.Errorf("no HostedControlPlane found in namespace %s", namespace)
+	}
+	if len(list) > 1 {
+		return nil, fmt.Errorf("more than one HostedControlPlane found in namespace %s", namespace)
+	}
+
+	hcp := list[0].(*unstructured.Unstructured)
+	if hcp == nil {
+		return nil, fmt.Errorf("unknown type of HostedControlPlane found in namespace %s", namespace)
+	}
+	return hcp, nil
 }
 
 func hyperShiftReplaceNamespaceHook(operandNamespace string) dc.DeploymentHookFunc {
