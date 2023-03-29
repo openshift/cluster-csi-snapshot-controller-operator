@@ -30,10 +30,18 @@ import (
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/klog/v2"
 )
@@ -64,6 +72,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
+	controlPlaneDynamicClient, err := dynamic.NewForConfig(rest.AddUserAgent(controlPlaneKubeConfig, targetName))
+	if err != nil {
+		return err
+	}
+
 	eventRecorder := controllerConfig.EventRecorder
 	controlPlaneNamespace := controllerConfig.OperatorNamespace
 	// Guest kubeconfig is the same as the management cluster one unless guestKubeConfigFile is provided
@@ -88,6 +101,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}
 
 	controlPlaneInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, "", controlPlaneNamespace)
+	controlPlaneDynamicInformers := dynamicinformer.NewFilteredDynamicSharedInformerFactory(controlPlaneDynamicClient, resync, controlPlaneNamespace, nil)
 	guestKubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(guestKubeClient, "", guestNamespace)
 
 	// config.openshift.io client - use the guest cluster (Infrastructure)
@@ -188,14 +202,32 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	priorityClass := defaultPriorityClass
 	var deploymentHooks []dc.DeploymentHookFunc
+	deploymentInformers := []factory.Informer{
+		guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
+		guestConfigInformers.Config().V1().Infrastructures().Informer(),
+	}
+
 	if isHyperShift {
 		priorityClass = hypershiftPriorityClass
+
+		// Create HostedControlPlane informer
+		hcpGVR := schema.GroupVersionResource{
+			Group:    "hypershift.openshift.io",
+			Version:  "v1beta1",
+			Resource: "hostedcontrolplanes",
+		}
+		hcpInformer := controlPlaneDynamicInformers.ForResource(hcpGVR)
+		deploymentInformers = append(deploymentInformers, hcpInformer.Informer())
+
 		deploymentHooks = []dc.DeploymentHookFunc{
 			hyperShiftReplaceNamespaceHook(controlPlaneNamespace),
-			hyperShiftRemoveNodeSelector(),
 			hyperShiftAddKubeConfigVolume("service-network-admin-kubeconfig"), // TODO: use dedicated secret for Snapshots
 			hyperShiftAddPullSecret(),
+			hyperShiftControlPlaneIsolationHook(controlPlaneNamespace),
+			hyperShiftColocationHook(controlPlaneNamespace),
+			hyperShiftNodeSelectorHook(hcpInformer.Lister(), controlPlaneNamespace),
 		}
+
 	} else {
 		// Standalone OCP
 		deploymentHooks = []dc.DeploymentHookFunc{
@@ -212,10 +244,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestOperatorClient,
 		controlPlaneKubeClient,
 		controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Apps().V1().Deployments(),
-		[]factory.Informer{
-			guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
-			guestConfigInformers.Config().V1().Infrastructures().Informer(),
-		},
+		deploymentInformers,
 		[]dc.ManifestHookFunc{
 			replacePlaceholdersHook(os.Getenv(operandImageEnvName), priorityClass),
 		},
@@ -291,6 +320,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	for _, informer := range []interface {
 		Start(stopCh <-chan struct{})
 	}{
+		controlPlaneDynamicInformers,
 		dynamicInformers,
 		guestConfigInformers,
 		controlPlaneInformersForNamespaces,
@@ -338,6 +368,52 @@ func replacePlaceholdersHook(imageName, priorityClass string) dc.ManifestHookFun
 	}
 }
 
+func hyperShiftNodeSelectorHook(hcpLister cache.GenericLister, controlPlaneNamespace string) dc.DeploymentHookFunc {
+	return func(_ *operatorv1.OperatorSpec, d *appsv1.Deployment) error {
+		nodeSelector, err := getHostedControlPlaneNodeSelector(hcpLister, controlPlaneNamespace)
+		if err != nil {
+			return err
+		}
+		d.Spec.Template.Spec.NodeSelector = nodeSelector
+		return nil
+	}
+}
+
+func getHostedControlPlaneNodeSelector(hostedControlPlaneLister cache.GenericLister, namespace string) (map[string]string, error) {
+	hcp, err := getHostedControlPlane(hostedControlPlaneLister, namespace)
+	if err != nil {
+		return nil, err
+	}
+	nodeSelector, exists, err := unstructured.NestedStringMap(hcp.UnstructuredContent(), "spec", "nodeSelector")
+	if !exists {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	klog.V(4).Infof("Using node selector %v", nodeSelector)
+	return nodeSelector, nil
+}
+
+func getHostedControlPlane(hostedControlPlaneLister cache.GenericLister, namespace string) (*unstructured.Unstructured, error) {
+	list, err := hostedControlPlaneLister.ByNamespace(namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, fmt.Errorf("no HostedControlPlane found in namespace %s", namespace)
+	}
+	if len(list) > 1 {
+		return nil, fmt.Errorf("more than one HostedControlPlane found in namespace %s", namespace)
+	}
+
+	hcp := list[0].(*unstructured.Unstructured)
+	if hcp == nil {
+		return nil, fmt.Errorf("unknown type of HostedControlPlane found in namespace %s", namespace)
+	}
+	return hcp, nil
+}
+
 func hyperShiftReplaceNamespaceHook(operandNamespace string) dc.DeploymentHookFunc {
 	return func(_ *operatorv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		deployment.Namespace = operandNamespace
@@ -345,9 +421,85 @@ func hyperShiftReplaceNamespaceHook(operandNamespace string) dc.DeploymentHookFu
 	}
 }
 
-func hyperShiftRemoveNodeSelector() dc.DeploymentHookFunc {
-	return func(_ *operatorv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		deployment.Spec.Template.Spec.NodeSelector = map[string]string{}
+func hyperShiftColocationHook(controlPlaneNamespace string) dc.DeploymentHookFunc {
+	return func(_ *operatorv1.OperatorSpec, d *appsv1.Deployment) error {
+		if d.Spec.Template.Spec.Affinity == nil {
+			d.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+		}
+		if d.Spec.Template.Spec.Affinity.PodAffinity == nil {
+			d.Spec.Template.Spec.Affinity.PodAffinity = &corev1.PodAffinity{}
+		}
+		if d.Spec.Template.Labels == nil {
+			d.Spec.Template.Labels = map[string]string{}
+		}
+		d.Spec.Template.Labels["hypershift.openshift.io/hosted-control-plane"] = controlPlaneNamespace
+		d.Spec.Template.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.WeightedPodAffinityTerm{
+			{
+				Weight: 100,
+				PodAffinityTerm: corev1.PodAffinityTerm{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"hypershift.openshift.io/hosted-control-plane": controlPlaneNamespace,
+						},
+					},
+					TopologyKey: corev1.LabelHostname,
+				},
+			},
+		}
+		return nil
+	}
+}
+
+func hyperShiftControlPlaneIsolationHook(controlPlaneNamespace string) dc.DeploymentHookFunc {
+	return func(_ *operatorv1.OperatorSpec, d *appsv1.Deployment) error {
+		d.Spec.Template.Spec.Tolerations = []corev1.Toleration{
+			{
+				Key:      "hypershift.openshift.io/control-plane",
+				Operator: corev1.TolerationOpEqual,
+				Value:    "true",
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+			{
+				Key:      "hypershift.openshift.io/cluster",
+				Operator: corev1.TolerationOpEqual,
+				Value:    controlPlaneNamespace,
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+		}
+
+		if d.Spec.Template.Spec.Affinity == nil {
+			d.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+		}
+		if d.Spec.Template.Spec.Affinity.NodeAffinity == nil {
+			d.Spec.Template.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+		}
+
+		d.Spec.Template.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.PreferredSchedulingTerm{
+			{
+				Weight: 50,
+				Preference: corev1.NodeSelectorTerm{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
+						{
+							Key:      "hypershift.openshift.io/control-plane",
+							Operator: corev1.NodeSelectorOpIn,
+							Values:   []string{"true"},
+						},
+					},
+				},
+			},
+			{
+				Weight: 100,
+				Preference: corev1.NodeSelectorTerm{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
+						{
+							Key:      "hypershift.openshift.io/cluster",
+							Operator: corev1.NodeSelectorOpIn,
+							Values:   []string{controlPlaneNamespace},
+						},
+					},
+				},
+			},
+		}
 		return nil
 	}
 }
