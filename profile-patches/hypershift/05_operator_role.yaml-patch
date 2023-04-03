@@ -6,3 +6,16 @@
 # control-plane-operator will set the right namespace
 - op: remove
   path: /metadata/namespace
+
+# the operator watches HostedControlPlane
+- op: add
+  path: /rules/-
+  value:
+    apiGroups:
+    - hypershift.openshift.io
+    resources:
+    - hostedcontrolplanes
+    verbs:
+    - watch
+    - list
+    - get
