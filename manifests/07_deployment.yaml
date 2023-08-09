@@ -69,5 +69,6 @@ spec:
         effect: "NoSchedule"
       securityContext:
         runAsNonRoot: true
+        readOnlyRootFilesystem: false
         seccompProfile:
           type: RuntimeDefault

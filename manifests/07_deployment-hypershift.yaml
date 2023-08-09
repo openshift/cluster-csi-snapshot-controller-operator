@@ -52,6 +52,7 @@ spec:
         - mountPath: /etc/guest-kubeconfig
           name: guest-kubeconfig
       securityContext:
+        readOnlyRootFilesystem: false
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
