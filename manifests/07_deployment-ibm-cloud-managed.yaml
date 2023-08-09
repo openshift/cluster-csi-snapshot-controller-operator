@@ -53,6 +53,7 @@ spec:
         terminationMessagePolicy: FallbackToLogsOnError
       priorityClassName: system-cluster-critical
       securityContext:
+        readOnlyRootFilesystem: false
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
