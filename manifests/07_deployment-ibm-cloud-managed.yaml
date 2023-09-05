@@ -50,6 +50,7 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: false
         terminationMessagePolicy: FallbackToLogsOnError
       priorityClassName: system-cluster-critical
       securityContext:
