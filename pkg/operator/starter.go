@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	informercorev1 "k8s.io/client-go/informers/core/v1"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -58,6 +59,7 @@ const (
 	defaultPriorityClass     = "system-cluster-critical"
 	hypershiftPriorityClass  = "hypershift-control-plane"
 	hyperShiftPullSecretName = "pull-secret"
+	webhookSecretName        = "csi-snapshot-webhook-secret"
 
 	resync = 20 * time.Minute
 )
@@ -255,6 +257,17 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
+	var secretInformer informercorev1.SecretInformer
+	if isHyperShift {
+		secretInformer = controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
+	} else {
+		secretInformer = guestKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
+	}
+	deploymentHooks = append(deploymentHooks, csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(
+		guestNamespace,
+		webhookSecretName,
+		secretInformer,
+	))
 	webhookDeploymentController := dc.NewDeploymentController(
 		// Name of this controller must match SISnapshotWebhookController from 4.11
 		// so it "adopts" its conditions during upgrade
@@ -267,6 +280,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		[]factory.Informer{
 			guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
 			guestConfigInformers.Config().V1().Infrastructures().Informer(),
+			secretInformer.Informer(),
 		},
 		[]dc.ManifestHookFunc{
 			replacePlaceholdersHook(os.Getenv(webhookImageEnvName), priorityClass),
