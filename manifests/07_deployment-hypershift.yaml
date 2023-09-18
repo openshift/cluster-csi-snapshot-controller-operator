@@ -47,12 +47,12 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: false
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /etc/guest-kubeconfig
           name: guest-kubeconfig
       securityContext:
-        readOnlyRootFilesystem: false
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
