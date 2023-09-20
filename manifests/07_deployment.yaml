@@ -32,6 +32,7 @@ spec:
             cpu: 10m
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
           capabilities:
             drop:
             - ALL
