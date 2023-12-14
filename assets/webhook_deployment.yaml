@@ -20,6 +20,7 @@ spec:
       labels:
         app: csi-snapshot-webhook
     spec:
+      automountServiceAccountToken: false
       containers:
       - name: webhook
         image: ${OPERAND_IMAGE}
