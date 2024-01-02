@@ -20,7 +20,6 @@ spec:
       containers:
       - args:
         - start
-        - -v=2
         - --guest-kubeconfig=/etc/guest-kubeconfig/kubeconfig
         env:
         - name: OPERAND_IMAGE

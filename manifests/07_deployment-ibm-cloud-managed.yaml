@@ -24,7 +24,6 @@ spec:
       containers:
       - args:
         - start
-        - -v=2
         env:
         - name: OPERAND_IMAGE
           value: quay.io/openshift/origin-csi-snapshot-controller
