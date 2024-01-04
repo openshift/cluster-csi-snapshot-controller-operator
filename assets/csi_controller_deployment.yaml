@@ -23,6 +23,7 @@ spec:
       labels:
         app: csi-snapshot-controller
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:
