@@ -22,7 +22,6 @@ spec:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: csi-snapshot-controller
-        hypershift.openshift.io/need-management-kas-access: "true"
     spec:
       securityContext:
         runAsNonRoot: true
