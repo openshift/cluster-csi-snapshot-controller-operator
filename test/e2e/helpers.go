@@ -53,7 +53,7 @@ func CreatePVC(namespace, scName string, uid types.UID, size int) *corev1.Persis
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					"storage": *resource.NewQuantity(int64(size), resource.BinarySI),
 				},
