@@ -16,6 +16,7 @@ import (
 	"github.com/openshift/library-go/pkg/config/client"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -43,7 +44,6 @@ import (
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-
 	"k8s.io/klog/v2"
 )
 
@@ -128,6 +128,37 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	}
 
 	versionGetter := status.NewVersionGetter()
+
+	// Get the known feature gates.
+	desiredVersion := status.VersionForOperatorFromEnv()
+	missingVersion := "0.0.1-snapshot"
+	featureGateAccessor := featuregates.NewFeatureGateAccess(
+		desiredVersion,
+		missingVersion,
+		guestConfigInformers.Config().V1().ClusterVersions(),
+		guestConfigInformers.Config().V1().FeatureGates(),
+		eventRecorder,
+	)
+	go featureGateAccessor.Run(ctx)
+	go guestConfigInformers.Start(ctx.Done())
+
+	select {
+	case <-featureGateAccessor.InitialFeatureGatesObserved():
+		featureGates, _ := featureGateAccessor.CurrentFeatureGates()
+		klog.Infof("FeatureGates initialized: knownFeatureGates=%v", featureGates.KnownFeatures())
+	case <-time.After(1 * time.Minute):
+		klog.Errorf("timed out waiting for FeatureGate detection")
+		return fmt.Errorf("timed out waiting for FeatureGate detection")
+	}
+
+	featureGates, err := featureGateAccessor.CurrentFeatureGates()
+	if err != nil {
+		return err
+	}
+
+	// Verify whether the VolumeGroupSnapshot feature is enabled or not. This variable will be
+	// used to decided what resources will be deployed in the cluster.
+	volumeGroupSnapshotAPIEnabled := featureGates.Enabled(configv1.FeatureGateVolumeGroupSnapshot)
 
 	namespacedAssetFunc := namespaceReplacer(assets.ReadFile, "${CONTROLPLANE_NAMESPACE}", controlPlaneNamespace)
 	guestStaticResourceController := staticresourcecontroller.NewStaticResourceController(
@@ -237,6 +268,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			csidrivercontrollerservicecontroller.WithReplicasHook(
 				guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Lister(),
 			),
+			withVolumeGroupSnapshotWebhook(volumeGroupSnapshotAPIEnabled),
 		}
 	}
 	controllerDeploymentController := dc.NewDeploymentController(
@@ -588,5 +620,23 @@ func namespaceReplacer(assetFunc resourceapply.AssetFunc, placeholder, namespace
 		}
 		asset = bytes.ReplaceAll(asset, []byte(placeholder), []byte(namespace))
 		return asset, nil
+	}
+}
+
+func withVolumeGroupSnapshotWebhook(enabled bool) dc.DeploymentHookFunc {
+	return func(_ *operatorv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		if !enabled {
+			return nil
+		}
+		for i := range deployment.Spec.Template.Spec.Containers {
+			container := &deployment.Spec.Template.Spec.Containers[i]
+			switch container.Name {
+			case "snapshot-controller":
+				container.Args = append(container.Args, "--enable-volume-group-snapshots")
+			case "webhook":
+				container.Args = append(container.Args, "--enable-volume-group-snapshot-webhook")
+			}
+		}
+		return nil
 	}
 }
