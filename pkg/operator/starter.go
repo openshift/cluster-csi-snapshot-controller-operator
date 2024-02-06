@@ -172,6 +172,19 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		resourceapply.NewKubeClientHolder(guestKubeClient).WithAPIExtensionsClient(guestAPIExtClient),
 		guestOperatorClient,
 		eventRecorder,
+	).WithConditionalResources(
+		namespacedAssetFunc,
+		[]string{
+			"rbac/webhook_clusterrole.yaml",
+			"rbac/csi_snapshot_controller_clusterrole.yaml",
+			"rbac/csi_snapshot_controller_clusterrolebinding.yaml",
+			"rbac/webhook_clusterrolebinding.yaml",
+			"volumegroupnapshots.yaml",
+			"volumegroupnapshotcontents.yaml",
+			"volumegroupnapshotclasses.yaml",
+		},
+		func() bool { return volumeGroupSnapshotAPIEnabled },
+		func() bool { return !volumeGroupSnapshotAPIEnabled },
 	)
 
 	controlPlaneStaticResourcesController := staticresourcecontroller.NewStaticResourceController(
@@ -179,6 +192,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		namespacedAssetFunc,
 		[]string{
 			"serviceaccount.yaml",
+			"webhook_serviceaccount.yaml",
 			"webhook_service.yaml",
 		},
 		resourceapply.NewKubeClientHolder(controlPlaneKubeClient),
