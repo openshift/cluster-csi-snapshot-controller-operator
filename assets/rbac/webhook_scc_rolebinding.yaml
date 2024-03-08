@@ -1,0 +1,13 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-snapshot-webhook-scc-rolebinding
+  namespace: ${CONTROLPLANE_NAMESPACE}
+subjects:
+  - kind: ServiceAccount
+    name: csi-snapshot-webhook
+    namespace: ${CONTROLPLANE_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: csi-snapshot-webhook-scc-role

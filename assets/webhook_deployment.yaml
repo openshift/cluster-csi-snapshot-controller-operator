@@ -59,6 +59,9 @@ spec:
       restartPolicy: Always
       securityContext:
         runAsNonRoot: true
+        # For running on hosted control plane on non-OCP clusters, such as ARO.
+        # On OCP, `restricted` SCC would inject non-root user automatically.
+        runAsUser: 1001
         seccompProfile:
           type: RuntimeDefault
       nodeSelector:

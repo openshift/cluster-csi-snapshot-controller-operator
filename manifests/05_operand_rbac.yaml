@@ -36,6 +36,11 @@ rules:
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotcontents/status"]
     verbs: ["update", "patch"]
+  # We use epxlicit UID in the controller Deployment, see a comment in csi_controller_deployment.yaml.
+  - apiGroups: ["security.openshift.io"]
+    resourceNames: ["nonroot-v2"]
+    resources: ["securitycontextconstraints"]
+    verbs: ["use"]
 
 ---
 kind: ClusterRoleBinding

@@ -191,6 +191,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		"CSISnapshotStaticResourceController",
 		namespacedAssetFunc,
 		[]string{
+			"rbac/webhook_scc_role.yaml",
+			"rbac/webhook_scc_rolebinding.yaml",
 			"serviceaccount.yaml",
 			"webhook_serviceaccount.yaml",
 			"webhook_service.yaml",

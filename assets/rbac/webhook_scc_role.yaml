@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: csi-snapshot-webhook-scc-role
+  namespace: ${CONTROLPLANE_NAMESPACE}
+rules:
+# We use epxlicit UID in the controller Deployment, see a comment in webhook_deployment.yaml.
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - nonroot-v2
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
