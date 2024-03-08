@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -273,6 +274,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			hyperShiftControlPlaneIsolationHook(controlPlaneNamespace),
 			hyperShiftColocationHook(controlPlaneNamespace),
 			hyperShiftNodeSelectorHook(hcpInformer.Lister(), controlPlaneNamespace),
+			hyperShiftSetSecurityContext(),
 		}
 
 	} else {
@@ -477,6 +479,24 @@ func getHostedControlPlane(hostedControlPlaneLister cache.GenericLister, namespa
 func hyperShiftReplaceNamespaceHook(operandNamespace string) dc.DeploymentHookFunc {
 	return func(_ *operatorv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		deployment.Namespace = operandNamespace
+		return nil
+	}
+}
+
+// hyperShiftSetSecurityContext sets the RunAsNonRoot to false and sets the RunAsUser to 1001 when the management
+// cluster does not support SCC. This was added to allow HyperShift to run on Azure Kubernetes Service (AKS) as its
+// management cluster for Azure Red Hat OpenShift (ARO) HCP. A patch was added to the HyperShift repo to set this OS
+// environment variable if the management cluster HyperShift is running supports SCC.
+//
+// See https://issues.redhat.com/browse/STOR-1805 for further details.
+func hyperShiftSetSecurityContext() dc.DeploymentHookFunc {
+	return func(_ *operatorv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		hyperShiftSupportsSCC, ok := os.LookupEnv("HYPERSHIFT_SUPPORTS_SCC")
+
+		if ok && hyperShiftSupportsSCC == "false" {
+			deployment.Spec.Template.Spec.SecurityContext.RunAsNonRoot = ptr.To(false)
+			deployment.Spec.Template.Spec.SecurityContext.RunAsUser = ptr.To[int64](1001)
+		}
 		return nil
 	}
 }
