@@ -184,7 +184,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"volumegroupsnapshotclasses.yaml",
 		},
 		func() bool { return volumeGroupSnapshotAPIEnabled },
-		func() bool { return !volumeGroupSnapshotAPIEnabled },
+		func() bool { return false },
 	)
 
 	controlPlaneStaticResourcesController := staticresourcecontroller.NewStaticResourceController(
