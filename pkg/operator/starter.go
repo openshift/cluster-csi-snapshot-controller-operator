@@ -167,6 +167,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		"CSISnapshotGuestStaticResourceController",
 		namespacedAssetFunc,
 		[]string{
+			"rbac/webhook_clusterrole.yaml",
+			"rbac/webhook_clusterrolebinding.yaml",
 			"volumesnapshots.yaml",
 			"volumesnapshotcontents.yaml",
 			"volumesnapshotclasses.yaml",
@@ -177,10 +179,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	).WithConditionalResources(
 		namespacedAssetFunc,
 		[]string{
-			"rbac/webhook_clusterrole.yaml",
-			"rbac/csi_snapshot_controller_clusterrole.yaml",
-			"rbac/csi_snapshot_controller_clusterrolebinding.yaml",
-			"rbac/webhook_clusterrolebinding.yaml",
 			"volumegroupsnapshots.yaml",
 			"volumegroupsnapshotcontents.yaml",
 			"volumegroupsnapshotclasses.yaml",
