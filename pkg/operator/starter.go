@@ -167,6 +167,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		"CSISnapshotGuestStaticResourceController",
 		namespacedAssetFunc,
 		[]string{
+			"rbac/csi_snapshot_controller_clusterrole.yaml",
+			"rbac/csi_snapshot_controller_clusterrolebinding.yaml",
 			"rbac/webhook_clusterrole.yaml",
 			"rbac/webhook_clusterrolebinding.yaml",
 			"volumesnapshots.yaml",
