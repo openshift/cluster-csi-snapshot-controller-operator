@@ -131,6 +131,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		"CSISnapshotGuestStaticResourceController",
 		namespacedAssetFunc,
 		[]string{
+			"rbac/webhook_clusterrole.yaml",
+			"rbac/webhook_clusterrolebinding.yaml",
 			"volumesnapshots.yaml",
 			"volumesnapshotcontents.yaml",
 			"volumesnapshotclasses.yaml",
@@ -145,6 +147,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		namespacedAssetFunc,
 		[]string{
 			"serviceaccount.yaml",
+			"webhook_serviceaccount.yaml",
 			"webhook_service.yaml",
 		},
 		resourceapply.NewKubeClientHolder(controlPlaneKubeClient),
