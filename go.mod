@@ -2,7 +2,7 @@ module github.com/openshift/cluster-csi-snapshot-controller-operator
 
 go 1.21
 
-toolchain go1.21.3
+toolchain go1.21.7
 
 require (
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0
