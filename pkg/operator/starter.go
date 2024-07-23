@@ -270,7 +270,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			hyperShiftReplaceNamespaceHook(controlPlaneNamespace),
 			hyperShiftAddKubeConfigVolume("service-network-admin-kubeconfig"), // TODO: use dedicated secret for Snapshots
 			hyperShiftAddPullSecret(),
-			hyperShiftControlPlaneIsolationHook(controlPlaneNamespace),
+			hyperShiftControlPlaneIsolationHook(hcpInformer.Lister(), controlPlaneNamespace),
 			hyperShiftColocationHook(controlPlaneNamespace),
 			hyperShiftNodeSelectorHook(hcpInformer.Lister(), controlPlaneNamespace),
 			hyperShiftSetSecurityContext(),
@@ -456,6 +456,68 @@ func getHostedControlPlaneNodeSelector(hostedControlPlaneLister cache.GenericLis
 	return nodeSelector, nil
 }
 
+func getHostedControlPlaneTolerations(hostedControlPlaneLister cache.GenericLister, namespace string) ([]corev1.Toleration, error) {
+	hcp, err := getHostedControlPlane(hostedControlPlaneLister, namespace)
+	if err != nil {
+		return nil, err
+	}
+	var tolerations []corev1.Toleration
+	tolerationsArray, tolerationsArrayFound, err := unstructured.NestedFieldCopy(hcp.UnstructuredContent(), "spec", "tolerations")
+	if !tolerationsArrayFound {
+		return tolerations, nil
+	}
+	tolerationsArrayConverted, hasConverted := tolerationsArray.([]interface{})
+	if !hasConverted {
+		return tolerations, nil
+	}
+
+	for _, entry := range tolerationsArrayConverted {
+		tolerationConverted, hasConverted := entry.(map[string]interface{})
+		if hasConverted {
+			toleration := corev1.Toleration{}
+			raw, ok := tolerationConverted["key"]
+			if ok {
+				str, isString := raw.(string)
+				if isString {
+					toleration.Key = str
+				}
+			}
+			raw, ok = tolerationConverted["operator"]
+			if ok {
+				op, isOperator := raw.(string)
+				if isOperator {
+					toleration.Operator = corev1.TolerationOperator(op)
+				}
+			}
+			raw, ok = tolerationConverted["value"]
+			if ok {
+				str, isString := raw.(string)
+				if isString {
+					toleration.Value = str
+				}
+			}
+			raw, ok = tolerationConverted["effect"]
+			if ok {
+				effect, isEffect := raw.(string)
+				if isEffect {
+					toleration.Effect = corev1.TaintEffect(effect)
+				}
+			}
+			raw, ok = tolerationConverted["tolerationSeconds"]
+			if ok {
+				seconds, isSeconds := raw.(*int64)
+				if isSeconds {
+					toleration.TolerationSeconds = seconds
+				}
+			}
+			tolerations = append(tolerations, toleration)
+		}
+	}
+
+	klog.V(4).Infof("Using tolerations %v", tolerations)
+	return tolerations, nil
+}
+
 func getHostedControlPlane(hostedControlPlaneLister cache.GenericLister, namespace string) (*unstructured.Unstructured, error) {
 	list, err := hostedControlPlaneLister.ByNamespace(namespace).List(labels.Everything())
 	if err != nil {
@@ -532,7 +594,7 @@ func hyperShiftColocationHook(controlPlaneNamespace string) dc.DeploymentHookFun
 	}
 }
 
-func hyperShiftControlPlaneIsolationHook(controlPlaneNamespace string) dc.DeploymentHookFunc {
+func hyperShiftControlPlaneIsolationHook(hcpLister cache.GenericLister, controlPlaneNamespace string) dc.DeploymentHookFunc {
 	return func(_ *operatorv1.OperatorSpec, d *appsv1.Deployment) error {
 		d.Spec.Template.Spec.Tolerations = []corev1.Toleration{
 			{
@@ -548,6 +610,13 @@ func hyperShiftControlPlaneIsolationHook(controlPlaneNamespace string) dc.Deploy
 				Effect:   corev1.TaintEffectNoSchedule,
 			},
 		}
+
+		customTolerations, err := getHostedControlPlaneTolerations(hcpLister, controlPlaneNamespace)
+		if err != nil {
+			return err
+		}
+
+		d.Spec.Template.Spec.Tolerations = append(d.Spec.Template.Spec.Tolerations, customTolerations...)
 
 		if d.Spec.Template.Spec.Affinity == nil {
 			d.Spec.Template.Spec.Affinity = &corev1.Affinity{}
