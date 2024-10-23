@@ -71,7 +71,10 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Kubeconfig received through service account or --kubeconfig arg
 	// is for the management cluster.
 	controlPlaneKubeConfig := controllerConfig.KubeConfig
-	controlPlaneKubeClient, err := kubeclient.NewForConfig(rest.AddUserAgent(controlPlaneKubeConfig, targetName))
+	config := rest.CopyConfig(controlPlaneKubeConfig)
+	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+	controlPlaneKubeClient, err := kubeclient.NewForConfig(rest.AddUserAgent(config, targetName))
 	if err != nil {
 		return err
 	}
