@@ -8,3 +8,4 @@ spec:
   selector:
     matchLabels:
       app: csi-snapshot-controller
+  unhealthyEvictionPolicy: AlwaysAllow

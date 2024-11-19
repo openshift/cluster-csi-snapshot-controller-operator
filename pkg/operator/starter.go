@@ -13,6 +13,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformer "github.com/openshift/client-go/config/informers/externalversions"
+	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	"github.com/openshift/library-go/pkg/config/client"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -38,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -46,6 +48,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
 
@@ -124,7 +127,16 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Create GenericOperatorClient. This is used by the library-go controllers created down below
 	// Operator CR is in the guest cluster.
 	gvr := operatorv1.SchemeGroupVersion.WithResource("csisnapshotcontrollers")
-	guestOperatorClient, dynamicInformers, err := goc.NewClusterScopedOperatorClientWithConfigName(guestKubeConfig, gvr, "cluster")
+	gvk := operatorv1.SchemeGroupVersion.WithKind("CSISnapshotController")
+	guestOperatorClient, dynamicInformers, err := goc.NewClusterScopedOperatorClientWithConfigName(
+		clock.RealClock{},
+		guestKubeConfig,
+		gvr,
+		gvk,
+		"cluster",
+		extractOperatorSpec,
+		extractOperatorStatus,
+	)
 	if err != nil {
 		return err
 	}
@@ -160,7 +172,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// Verify whether the VolumeGroupSnapshot feature is enabled or not. This variable will be
 	// used to decided what resources will be deployed in the cluster.
-	volumeGroupSnapshotAPIEnabled := featureGates.Enabled(configv1.FeatureGateVolumeGroupSnapshot)
+	volumeGroupSnapshotAPIEnabled := featureGates.Enabled(configv1.FeatureGateName("VolumeGroupSnapshot"))
 
 	namespacedAssetFunc := namespaceReplacer(assets.ReadFile, "${CONTROLPLANE_NAMESPACE}", controlPlaneNamespace)
 	guestStaticResourceController := staticresourcecontroller.NewStaticResourceController(
@@ -281,7 +293,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		deploymentHooks = []dc.DeploymentHookFunc{
 			csidrivercontrollerservicecontroller.WithControlPlaneTopologyHook(guestConfigInformers),
 			csidrivercontrollerservicecontroller.WithReplicasHook(
-				guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Lister(),
+				guestConfigInformers,
 			),
 			withVolumeGroupSnapshotWebhook(volumeGroupSnapshotAPIEnabled),
 		}
@@ -744,4 +756,34 @@ func withVolumeGroupSnapshotWebhook(enabled bool) dc.DeploymentHookFunc {
 		}
 		return nil
 	}
+}
+
+func extractOperatorSpec(obj *unstructured.Unstructured, fieldManager string) (*applyoperatorv1.OperatorSpecApplyConfiguration, error) {
+	castObj := &operatorv1.CSISnapshotController{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, castObj); err != nil {
+		return nil, fmt.Errorf("unable to convert to CSISnapshotController: %w", err)
+	}
+	ret, err := applyoperatorv1.ExtractCSISnapshotController(castObj, fieldManager)
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract fields for %q: %w", fieldManager, err)
+	}
+	if ret.Spec == nil {
+		return nil, nil
+	}
+	return &ret.Spec.OperatorSpecApplyConfiguration, nil
+}
+func extractOperatorStatus(obj *unstructured.Unstructured, fieldManager string) (*applyoperatorv1.OperatorStatusApplyConfiguration, error) {
+	castObj := &operatorv1.CSISnapshotController{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, castObj); err != nil {
+		return nil, fmt.Errorf("unable to convert to CSISnapshotController: %w", err)
+	}
+	ret, err := applyoperatorv1.ExtractCSISnapshotControllerStatus(castObj, fieldManager)
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract fields for %q: %w", fieldManager, err)
+	}
+
+	if ret.Status == nil {
+		return nil, nil
+	}
+	return &ret.Status.OperatorStatusApplyConfiguration, nil
 }
