@@ -749,9 +749,9 @@ func withVolumeGroupSnapshotWebhook(enabled bool) dc.DeploymentHookFunc {
 			container := &deployment.Spec.Template.Spec.Containers[i]
 			switch container.Name {
 			case "snapshot-controller":
-				container.Args = append(container.Args, "--enable-volume-group-snapshots")
+				container.Args = append(container.Args, "-feature-gates=CSIVolumeGroupSnapshot=true")
 			case "webhook":
-				container.Args = append(container.Args, "--enable-volume-group-snapshot-webhook")
+				container.Args = append(container.Args, "-feature-gates=CSIVolumeGroupSnapshot=true")
 			}
 		}
 		return nil
