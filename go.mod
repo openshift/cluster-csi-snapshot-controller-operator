@@ -124,3 +124,5 @@ replace cloud.google.com/go => cloud.google.com/go v0.104.0
 
 // need this replace to keep upstream on go version 1.22 for bumping to 4.18, delete this in bump to 4.19
 replace sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd
+
+replace github.com/openshift/api => github.com/gnufied/api v0.0.0-20241120011244-2372cad37b95
