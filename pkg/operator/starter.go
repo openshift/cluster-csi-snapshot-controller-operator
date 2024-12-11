@@ -85,12 +85,16 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Guest kubeconfig is the same as the management cluster one unless guestKubeConfigFile is provided
 	guestKubeClient := controlPlaneKubeClient
 	guestKubeConfig := controlPlaneKubeConfig
+
+	guestDynamicClient := controlPlaneDynamicClient
 	if isHyperShift {
 		guestKubeConfig, err = client.GetKubeConfigOrInClusterConfig(guestKubeConfigFile, nil)
 		if err != nil {
 			return fmt.Errorf("failed to use guest kubeconfig %s: %s", guestKubeConfigFile, err)
 		}
 		guestKubeClient = kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, targetName))
+
+		guestDynamicClient = dynamic.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, targetName))
 
 		// Create all events in the guest cluster.
 		// Use name of the operator Deployment in the mgmt cluster + namespace in the guest cluster as the closest
@@ -328,6 +332,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	managementStateController := managementstatecontroller.NewOperatorManagementStateController(targetName, guestOperatorClient, eventRecorder)
 	management.SetOperatorNotRemovable()
 
+	mgmtCompositeClient := resourceapply.NewKubeClientHolder(controlPlaneKubeClient).WithDynamicClient(controlPlaneDynamicClient)
+	guestCompositeClient := resourceapply.NewKubeClientHolder(guestKubeClient).WithDynamicClient(guestDynamicClient)
+
+	webhookRemovalController := NewWebhookRemovalController("WebhookRemovalController", guestOperatorClient, guestCompositeClient, mgmtCompositeClient, eventRecorder)
+
 	klog.Info("Starting the Informers.")
 	for _, informer := range []interface {
 		Start(stopCh <-chan struct{})
@@ -353,6 +362,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		cndController,
 		guestStaticResourceController,
 		controlPlaneStaticResourcesController,
+		webhookRemovalController,
 	} {
 		if controller != nil {
 			go controller.Run(ctx, 1)
