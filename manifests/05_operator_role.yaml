@@ -32,6 +32,7 @@ rules:
   - create
   - update
   - patch
+  - delete
 - apiGroups:
   - policy
   resources:
@@ -43,6 +44,7 @@ rules:
   - create
   - update
   - patch
+  - delete
 - apiGroups:
   - ""
   resources:
@@ -56,6 +58,7 @@ rules:
   - create
   - update
   - patch
+  - delete
 - apiGroups:
   - ""
   resources:
