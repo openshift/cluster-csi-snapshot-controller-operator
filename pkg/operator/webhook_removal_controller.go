@@ -6,7 +6,6 @@ import (
 	"time"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
-	"github.com/openshift/cluster-csi-snapshot-controller-operator/assets"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -22,6 +21,7 @@ var (
 
 type webhookRemovalController struct {
 	name                 string
+	manifests            resourceapply.AssetFunc
 	operatorClient       v1helpers.OperatorClient
 	guestCompositeClient *resourceapply.ClientHolder
 	mgmtCompositeClient  *resourceapply.ClientHolder
@@ -30,6 +30,7 @@ type webhookRemovalController struct {
 
 func NewWebhookRemovalController(
 	name string,
+	manifests resourceapply.AssetFunc,
 	operatorClient v1helpers.OperatorClient,
 	guestCompositeClient *resourceapply.ClientHolder,
 	mgmtCompositeClient *resourceapply.ClientHolder,
@@ -37,6 +38,7 @@ func NewWebhookRemovalController(
 ) factory.Controller {
 	c := &webhookRemovalController{
 		name:                 name,
+		manifests:            manifests,
 		operatorClient:       operatorClient,
 		guestCompositeClient: guestCompositeClient,
 		mgmtCompositeClient:  mgmtCompositeClient,
@@ -64,7 +66,7 @@ func (c *webhookRemovalController) sync(ctx context.Context, syncContext factory
 		"rbac/webhook_clusterrolebinding.yaml",
 		"webhook_config.yaml",
 	}
-	guestResourceRemovalResult := resourceapply.DeleteAll(ctx, c.guestCompositeClient, c.eventRecorder, assets.ReadFile, guestAssetsTobeRemoved...)
+	guestResourceRemovalResult := resourceapply.DeleteAll(ctx, c.guestCompositeClient, c.eventRecorder, c.manifests, guestAssetsTobeRemoved...)
 	allErrors := []error{}
 
 	for _, result := range guestResourceRemovalResult {
@@ -79,7 +81,7 @@ func (c *webhookRemovalController) sync(ctx context.Context, syncContext factory
 		"webhook_deployment_pdb.yaml",
 		"webhook_deployment.yaml",
 	}
-	mgmtResouceRemovalResult := resourceapply.DeleteAll(ctx, c.mgmtCompositeClient, c.eventRecorder, assets.ReadFile, mgmtAssetsTobeRemoved...)
+	mgmtResouceRemovalResult := resourceapply.DeleteAll(ctx, c.mgmtCompositeClient, c.eventRecorder, c.manifests, mgmtAssetsTobeRemoved...)
 	for _, result := range mgmtResouceRemovalResult {
 		if result.Error != nil {
 			allErrors = append(allErrors, result.Error)

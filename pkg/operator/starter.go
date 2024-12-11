@@ -335,7 +335,12 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	mgmtCompositeClient := resourceapply.NewKubeClientHolder(controlPlaneKubeClient).WithDynamicClient(controlPlaneDynamicClient)
 	guestCompositeClient := resourceapply.NewKubeClientHolder(guestKubeClient).WithDynamicClient(guestDynamicClient)
 
-	webhookRemovalController := NewWebhookRemovalController("WebhookRemovalController", guestOperatorClient, guestCompositeClient, mgmtCompositeClient, eventRecorder)
+	webhookRemovalController := NewWebhookRemovalController("WebhookRemovalController",
+		namespacedAssetFunc,
+		guestOperatorClient,
+		guestCompositeClient,
+		mgmtCompositeClient,
+		eventRecorder)
 
 	klog.Info("Starting the Informers.")
 	for _, informer := range []interface {
