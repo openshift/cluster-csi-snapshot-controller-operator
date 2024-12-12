@@ -27,6 +27,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/staleconditions"
 	staticcontrollercommon "github.com/openshift/library-go/pkg/operator/staticpod/controller/common"
 	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/status"
@@ -335,12 +336,46 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	mgmtCompositeClient := resourceapply.NewKubeClientHolder(controlPlaneKubeClient).WithDynamicClient(controlPlaneDynamicClient)
 	guestCompositeClient := resourceapply.NewKubeClientHolder(guestKubeClient).WithDynamicClient(guestDynamicClient)
 
-	webhookRemovalController := NewWebhookRemovalController("WebhookRemovalController",
+	guestWebhookRemovalController := staticresourcecontroller.NewStaticResourceController(
+		"GuestWebhookRemovalStaticResourceController",
 		namespacedAssetFunc,
-		guestOperatorClient,
+		[]string{},
 		guestCompositeClient,
+		guestOperatorClient,
+		eventRecorder,
+	).WithConditionalResources(
+		namespacedAssetFunc,
+		[]string{
+			"rbac/webhook_clusterrole.yaml",
+			"rbac/webhook_clusterrolebinding.yaml",
+			"webhook_config.yaml",
+		},
+		func() bool { return false /* never create */ },
+		func() bool { return true /* always delete */ },
+	)
+
+	controllerWebhookRemovalController := staticresourcecontroller.NewStaticResourceController(
+		"ControllerWebhookRemovalStaticResourceController",
+		namespacedAssetFunc,
+		[]string{},
 		mgmtCompositeClient,
-		eventRecorder)
+		guestOperatorClient,
+		eventRecorder,
+	).WithConditionalResources(
+		// Deploy PDBs everywhere except SNO
+		namespacedAssetFunc,
+		[]string{
+			"webhook_serviceaccount.yaml",
+			"webhook_service.yaml",
+			"webhook_deployment_pdb.yaml",
+			"webhook_deployment.yaml",
+		},
+		func() bool { return false /* never create */ },
+		func() bool { return true /* always delete */ },
+	).AddKubeInformers(controlPlaneInformersForNamespaces)
+
+	conditionsToRemove := []string{"CSISnapshotWebhookControllerAvailable", "CSISnapshotWebhookControllerDegraded", "CSISnapshotWebhookControllerProgressing", "WebhookControllerDegraded"}
+	staleConditionsController := staleconditions.NewRemoveStaleConditionsController("RemoveStaleConditionsController", conditionsToRemove, guestOperatorClient, eventRecorder)
 
 	klog.Info("Starting the Informers.")
 	for _, informer := range []interface {
@@ -367,7 +402,9 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		cndController,
 		guestStaticResourceController,
 		controlPlaneStaticResourcesController,
-		webhookRemovalController,
+		guestWebhookRemovalController,
+		controllerWebhookRemovalController,
+		staleConditionsController,
 	} {
 		if controller != nil {
 			go controller.Run(ctx, 1)

@@ -320,6 +320,7 @@ github.com/openshift/library-go/pkg/operator/resource/resourcehelper
 github.com/openshift/library-go/pkg/operator/resource/resourcemerge
 github.com/openshift/library-go/pkg/operator/resource/resourceread
 github.com/openshift/library-go/pkg/operator/resourcesynccontroller
+github.com/openshift/library-go/pkg/operator/staleconditions
 github.com/openshift/library-go/pkg/operator/staticpod/controller/common
 github.com/openshift/library-go/pkg/operator/staticresourcecontroller
 github.com/openshift/library-go/pkg/operator/status
