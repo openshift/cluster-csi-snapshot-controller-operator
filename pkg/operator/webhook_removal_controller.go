@@ -45,10 +45,11 @@ func NewWebhookRemovalController(
 		eventRecorder:        eventRecorder,
 	}
 
-	return factory.New().WithInformers().WithSync(c.sync).ResyncEvery(time.Minute).ToController(
-		c.name,
-		eventRecorder.WithComponentSuffix("webhook-removal-controller-"),
-	)
+	return factory.New().WithInformers().
+		WithSync(c.sync).
+		ResyncEvery(time.Minute).
+		WithSyncDegradedOnError(operatorClient).
+		ToController(c.name, eventRecorder.WithComponentSuffix("webhook-removal-controller-"))
 }
 
 func (c *webhookRemovalController) sync(ctx context.Context, syncContext factory.SyncContext) error {
@@ -96,7 +97,6 @@ func (c *webhookRemovalController) sync(ctx context.Context, syncContext factory
 
 // removing conditions related to webhook controller
 func (c *webhookRemovalController) removeConditions(ctx context.Context, status *operatorv1.OperatorStatus) error {
-	updateFuncs := []v1helpers.UpdateStatusFunc{}
 	matchingConditions := []operatorv1.OperatorCondition{}
 
 	originalConditions := status.DeepCopy().Conditions
@@ -106,13 +106,16 @@ func (c *webhookRemovalController) removeConditions(ctx context.Context, status 
 			matchingConditions = append(matchingConditions, condition)
 		}
 	}
-	updateFuncs = append(updateFuncs, func(status *operatorv1.OperatorStatus) error {
+	if len(matchingConditions) == 0 {
+		return nil
+	}
+
+	updateFunc := func(status *operatorv1.OperatorStatus) error {
 		for _, condition := range matchingConditions {
 			v1helpers.RemoveOperatorCondition(&status.Conditions, condition.Type)
 		}
 		return nil
-	})
-	// also add a condition to indicate that the operator is disabled
-	_, _, err := v1helpers.UpdateStatus(ctx, c.operatorClient, updateFuncs...)
+	}
+	_, _, err := v1helpers.UpdateStatus(ctx, c.operatorClient, updateFunc)
 	return err
 }
