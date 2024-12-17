@@ -31,7 +31,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/staticresourcecontroller"
 	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -43,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
-	informercorev1 "k8s.io/client-go/informers/core/v1"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -59,12 +57,10 @@ const (
 	operatorVersionEnvName = "OPERATOR_IMAGE_VERSION"
 	operandVersionEnvName  = "OPERAND_IMAGE_VERSION"
 	operandImageEnvName    = "OPERAND_IMAGE"
-	webhookImageEnvName    = "WEBHOOK_IMAGE"
 
 	defaultPriorityClass     = "system-cluster-critical"
 	hypershiftPriorityClass  = "hypershift-control-plane"
 	hyperShiftPullSecretName = "pull-secret"
-	webhookSecretName        = "csi-snapshot-webhook-secret"
 
 	resync = 20 * time.Minute
 )
@@ -89,12 +85,16 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	// Guest kubeconfig is the same as the management cluster one unless guestKubeConfigFile is provided
 	guestKubeClient := controlPlaneKubeClient
 	guestKubeConfig := controlPlaneKubeConfig
+
+	guestDynamicClient := controlPlaneDynamicClient
 	if isHyperShift {
 		guestKubeConfig, err = client.GetKubeConfigOrInClusterConfig(guestKubeConfigFile, nil)
 		if err != nil {
 			return fmt.Errorf("failed to use guest kubeconfig %s: %s", guestKubeConfigFile, err)
 		}
 		guestKubeClient = kubeclient.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, targetName))
+
+		guestDynamicClient = dynamic.NewForConfigOrDie(rest.AddUserAgent(guestKubeConfig, targetName))
 
 		// Create all events in the guest cluster.
 		// Use name of the operator Deployment in the mgmt cluster + namespace in the guest cluster as the closest
@@ -179,8 +179,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		"CSISnapshotGuestStaticResourceController",
 		namespacedAssetFunc,
 		[]string{
-			"rbac/webhook_clusterrole.yaml",
-			"rbac/webhook_clusterrolebinding.yaml",
 			"volumesnapshots.yaml",
 			"volumesnapshotcontents.yaml",
 			"volumesnapshotclasses.yaml",
@@ -204,8 +202,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		namespacedAssetFunc,
 		[]string{
 			"serviceaccount.yaml",
-			"webhook_serviceaccount.yaml",
-			"webhook_service.yaml",
 		},
 		resourceapply.NewKubeClientHolder(controlPlaneKubeClient),
 		guestOperatorClient,
@@ -215,7 +211,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		namespacedAssetFunc,
 		[]string{
 			"csi_controller_deployment_pdb.yaml",
-			"webhook_deployment_pdb.yaml",
 		},
 		func() bool {
 			if isHyperShift {
@@ -241,23 +236,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	if err != nil {
 		return err
 	}
-
-	var webhookHooks []validatingWebhookConfigHook
-	if isHyperShift {
-		webhookHooks = []validatingWebhookConfigHook{
-			hyperShiftSetWebhookService(),
-		}
-	}
-	webhookController := NewValidatingWebhookConfigController(
-		"WebhookController",
-		guestOperatorClient,
-		guestKubeClient,
-		guestKubeInformersForNamespaces.InformersFor("").Admissionregistration().V1().ValidatingWebhookConfigurations(),
-		namespacedAssetFunc,
-		"webhook_config.yaml",
-		eventRecorder,
-		webhookHooks,
-	)
 
 	priorityClass := defaultPriorityClass
 	var deploymentHooks []dc.DeploymentHookFunc
@@ -295,7 +273,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			csidrivercontrollerservicecontroller.WithReplicasHook(
 				guestConfigInformers,
 			),
-			withVolumeGroupSnapshotWebhook(volumeGroupSnapshotAPIEnabled),
+			withVolumeGroupSnapshot(volumeGroupSnapshotAPIEnabled),
 		}
 	}
 	controllerDeploymentController := dc.NewDeploymentController(
@@ -308,41 +286,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		deploymentInformers,
 		[]dc.ManifestHookFunc{
 			replacePlaceholdersHook(os.Getenv(operandImageEnvName), priorityClass),
-		},
-		deploymentHooks...,
-	)
-
-	webhookDeploymentManifest, err := namespacedAssetFunc("webhook_deployment.yaml")
-	if err != nil {
-		return err
-	}
-	var secretInformer informercorev1.SecretInformer
-	if isHyperShift {
-		secretInformer = controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
-	} else {
-		secretInformer = guestKubeInformersForNamespaces.InformersFor(controlPlaneNamespace).Core().V1().Secrets()
-	}
-	deploymentHooks = append(deploymentHooks, csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(
-		guestNamespace,
-		webhookSecretName,
-		secretInformer,
-	))
-	webhookDeploymentController := dc.NewDeploymentController(
-		// Name of this controller must match SISnapshotWebhookController from 4.11
-		// so it "adopts" its conditions during upgrade
-		"CSISnapshotWebhookController",
-		webhookDeploymentManifest,
-		eventRecorder,
-		guestOperatorClient,
-		controlPlaneKubeClient,
-		controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Apps().V1().Deployments(),
-		[]factory.Informer{
-			guestKubeInformersForNamespaces.InformersFor("").Core().V1().Nodes().Informer(),
-			guestConfigInformers.Config().V1().Infrastructures().Informer(),
-			secretInformer.Informer(),
-		},
-		[]dc.ManifestHookFunc{
-			replacePlaceholdersHook(os.Getenv(webhookImageEnvName), priorityClass),
 		},
 		deploymentHooks...,
 	)
@@ -389,6 +332,16 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	managementStateController := managementstatecontroller.NewOperatorManagementStateController(targetName, guestOperatorClient, eventRecorder)
 	management.SetOperatorNotRemovable()
 
+	mgmtCompositeClient := resourceapply.NewKubeClientHolder(controlPlaneKubeClient).WithDynamicClient(controlPlaneDynamicClient)
+	guestCompositeClient := resourceapply.NewKubeClientHolder(guestKubeClient).WithDynamicClient(guestDynamicClient)
+
+	webhookRemovalController := NewWebhookRemovalController("WebhookRemovalController",
+		namespacedAssetFunc,
+		guestOperatorClient,
+		guestCompositeClient,
+		mgmtCompositeClient,
+		eventRecorder)
+
 	klog.Info("Starting the Informers.")
 	for _, informer := range []interface {
 		Start(stopCh <-chan struct{})
@@ -410,12 +363,11 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		logLevelController,
 		managementStateController,
 		controllerDeploymentController,
-		webhookDeploymentController,
 		versionController,
 		cndController,
 		guestStaticResourceController,
 		controlPlaneStaticResourcesController,
-		webhookController,
+		webhookRemovalController,
 	} {
 		if controller != nil {
 			go controller.Run(ctx, 1)
@@ -702,20 +654,6 @@ func hyperShiftAddKubeConfigVolume(secretName string) dc.DeploymentHookFunc {
 	}
 }
 
-func hyperShiftSetWebhookService() validatingWebhookConfigHook {
-	return func(configuration *admissionregistrationv1.ValidatingWebhookConfiguration) error {
-		for i := range configuration.Webhooks {
-			webhook := &configuration.Webhooks[i]
-			webhook.ClientConfig.Service = nil
-			// Name of csi-snapshot-webhook service in the same namespace as the guest API server.
-			url := "https://csi-snapshot-webhook"
-			webhook.ClientConfig.URL = &url
-		}
-
-		return nil
-	}
-}
-
 func hyperShiftAddPullSecret() dc.DeploymentHookFunc {
 	return func(_ *operatorv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		if deployment.Spec.Template.Spec.ImagePullSecrets == nil {
@@ -740,7 +678,7 @@ func namespaceReplacer(assetFunc resourceapply.AssetFunc, placeholder, namespace
 	}
 }
 
-func withVolumeGroupSnapshotWebhook(enabled bool) dc.DeploymentHookFunc {
+func withVolumeGroupSnapshot(enabled bool) dc.DeploymentHookFunc {
 	return func(_ *operatorv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		if !enabled {
 			return nil
@@ -749,9 +687,7 @@ func withVolumeGroupSnapshotWebhook(enabled bool) dc.DeploymentHookFunc {
 			container := &deployment.Spec.Template.Spec.Containers[i]
 			switch container.Name {
 			case "snapshot-controller":
-				container.Args = append(container.Args, "--enable-volume-group-snapshots")
-			case "webhook":
-				container.Args = append(container.Args, "--enable-volume-group-snapshot-webhook")
+				container.Args = append(container.Args, "--feature-gates=CSIVolumeGroupSnapshot=true")
 			}
 		}
 		return nil
