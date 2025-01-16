@@ -263,6 +263,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			hyperShiftControlPlaneIsolationHook(hcpInformer.Lister(), controlPlaneNamespace),
 			hyperShiftColocationHook(controlPlaneNamespace),
 			hyperShiftNodeSelectorHook(hcpInformer.Lister(), controlPlaneNamespace),
+			hyperShiftLabelsHook(hcpInformer.Lister(), controlPlaneNamespace),
 			hyperShiftSetSecurityContext(),
 		}
 
@@ -418,6 +419,39 @@ func getHostedControlPlaneNodeSelector(hostedControlPlaneLister cache.GenericLis
 	}
 	klog.V(4).Infof("Using node selector %v", nodeSelector)
 	return nodeSelector, nil
+}
+
+func hyperShiftLabelsHook(hcpLister cache.GenericLister, controlPlaneNamespace string) dc.DeploymentHookFunc {
+	return func(_ *operatorv1.OperatorSpec, d *appsv1.Deployment) error {
+		labels, err := getHostedControlPlaneLabels(hcpLister, controlPlaneNamespace)
+		if err != nil {
+			return err
+		}
+
+		for key, value := range labels {
+			// don't replace existing labels as they are used in the deployment's labelSelector.
+			if _, exist := d.Spec.Template.Labels[key]; !exist {
+				d.Spec.Template.Labels[key] = value
+			}
+		}
+		return nil
+	}
+}
+
+func getHostedControlPlaneLabels(hostedControlPlaneLister cache.GenericLister, namespace string) (map[string]string, error) {
+	hcp, err := getHostedControlPlane(hostedControlPlaneLister, namespace)
+	if err != nil {
+		return nil, err
+	}
+	labels, exists, err := unstructured.NestedStringMap(hcp.UnstructuredContent(), "spec", "labels")
+	if !exists {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	klog.V(4).Infof("Using labels %v", labels)
+	return labels, nil
 }
 
 func getHostedControlPlaneTolerations(hostedControlPlaneLister cache.GenericLister, namespace string) ([]corev1.Toleration, error) {
