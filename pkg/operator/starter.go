@@ -104,7 +104,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		if err != nil {
 			klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
 		}
-		eventRecorder = events.NewKubeRecorder(guestKubeClient.CoreV1().Events(guestNamespace), targetName, controllerRef)
+		eventRecorder = events.NewKubeRecorder(guestKubeClient.CoreV1().Events(guestNamespace), targetName, controllerRef, clock.RealClock{})
 	}
 
 	controlPlaneInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(controlPlaneKubeClient, "", controlPlaneNamespace)
@@ -313,6 +313,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestOperatorClient,
 		versionGetter,
 		eventRecorder,
+		clock.RealClock{},
 	)
 
 	// This is the only controller that sets Upgradeable condition
