@@ -19,6 +19,12 @@
 - op: remove
   path: /spec/template/spec/priorityClassName
 
+# Remove changes for readOnlyRootFilesystem
+- op: replace
+  path: /spec/template/spec/containers/0/securityContext/readOnlyRootFilesystem
+  value:
+    false
+
 # Add guest-kubeconfig volume
 - op: add
   path: /spec/template/spec/volumes
