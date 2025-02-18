@@ -71,12 +71,6 @@ rules:
   verbs:
   - "*"
 - apiGroups:
-  - admissionregistration.k8s.io
-  resources:
-  - validatingwebhookconfigurations
-  verbs:
-  - "*"
-- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterroles
