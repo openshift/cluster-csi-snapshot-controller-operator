@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"k8s.io/component-base/cli"
+	"k8s.io/utils/clock"
 )
 
 func main() {
@@ -33,7 +34,7 @@ func NewCSISnapshotControllerOperatorCommand() *cobra.Command {
 		},
 	}
 
-	cmd2 := controllercmd.NewControllerCommandConfig("csi-snapshot-controller-operator", version.Get(), runOperatorWithGuestKubeconfig).NewCommand()
+	cmd2 := controllercmd.NewControllerCommandConfig("csi-snapshot-controller-operator", version.Get(), runOperatorWithGuestKubeconfig, clock.RealClock{}).NewCommand()
 	cmd2.Use = "start"
 	cmd2.Short = "Start the CSI Snapshot Controller Operator"
 	guestKubeconfig = cmd2.Flags().String("guest-kubeconfig", "", "Path to the guest kubeconfig file. This flag enables hypershift integration.")
