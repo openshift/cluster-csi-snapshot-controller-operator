@@ -10,7 +10,3 @@ spec:
     from:
       kind: DockerImage
       name: quay.io/openshift/origin-csi-snapshot-controller
-  - name: csi-snapshot-validation-webhook
-    from:
-      kind: DockerImage
-      name: quay.io/openshift/origin-csi-snapshot-validation-webhook
