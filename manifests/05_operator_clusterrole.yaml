@@ -13,25 +13,49 @@ rules:
   resources:
   - csisnapshotcontrollers
   verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - operator.openshift.io
   resources:
   - csisnapshotcontrollers/status
   verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - config.openshift.io
   resources:
   - clusteroperators
   verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - config.openshift.io
   resources:
   - clusteroperators/status
   verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - config.openshift.io
   resources:
@@ -69,17 +93,25 @@ rules:
   resources:
   - customresourcedefinitions
   verbs:
-  - "*"
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# Only used by pkg/operator/webhook_removal_controller.go
 - apiGroups:
   - admissionregistration.k8s.io
   resources:
   - validatingwebhookconfigurations
   verbs:
-  - "*"
+  - delete
+# Only used by pkg/operator/webhook_removal_controller.go
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterroles
   - clusterrolebindings
   verbs:
-  - "*"
+  - delete
