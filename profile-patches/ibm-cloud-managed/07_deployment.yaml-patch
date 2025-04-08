@@ -6,3 +6,15 @@
     capability.openshift.io/name: CSISnapshot
 - op: remove
   path: /spec/template/spec/nodeSelector
+
+# Remove serving-cert volume
+- op: remove
+  path: /spec/template/spec/containers/0/volumeMounts
+- op: remove
+  path: /spec/template/spec/volumes
+
+# Remove changes for readOnlyRootFilesystem
+- op: replace
+  path: /spec/template/spec/containers/0/securityContext/readOnlyRootFilesystem
+  value:
+    false

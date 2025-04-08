@@ -31,9 +31,12 @@ spec:
           requests:
             memory: 65Mi
             cpu: 10m
+        volumeMounts:
+        - mountPath: /var/run/secrets/serving-cert
+          name: serving-cert
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
+          readOnlyRootFilesystem: true
           capabilities:
             drop:
             - ALL
@@ -52,6 +55,10 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         terminationMessagePolicy: FallbackToLogsOnError
+      volumes:
+      - name: serving-cert
+        secret:
+          secretName: serving-cert
       priorityClassName: "system-cluster-critical"
       nodeSelector:
         node-role.kubernetes.io/master: ""
