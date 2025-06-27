@@ -21,6 +21,9 @@ spec:
         openshift.io/required-scc: restricted-v2
       labels:
         app: csi-snapshot-controller-operator
+        openshift.storage.network-policy.dns: allow
+        openshift.storage.network-policy.api-server: allow
+        openshift.storage.network-policy.operator-metrics: allow
     spec:
       serviceAccountName: csi-snapshot-controller-operator
       containers:
