@@ -170,9 +170,10 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		return err
 	}
 
-	// Verify whether the VolumeGroupSnapshot feature is enabled or not. This variable will be
+	// Check whether the following featuregates are enabled or not. These variables will be
 	// used to decided what resources will be deployed in the cluster.
 	volumeGroupSnapshotAPIEnabled := featureGates.Enabled(configv1.FeatureGateName("VolumeGroupSnapshot"))
+	externalSnapshotMetadataAPIEnabled := featureGates.Enabled(configv1.FeatureGateName("ExternalSnapshotMetadata"))
 
 	namespacedAssetFunc := namespaceReplacer(assets.ReadFile, "${CONTROLPLANE_NAMESPACE}", controlPlaneNamespace)
 	guestStaticResourceController := staticresourcecontroller.NewStaticResourceController(
@@ -194,6 +195,13 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"volumegroupsnapshotclasses.yaml",
 		},
 		func() bool { return volumeGroupSnapshotAPIEnabled },
+		func() bool { return false },
+	).WithConditionalResources(
+		namespacedAssetFunc,
+		[]string{
+			"snapshotmetadataservices.yaml",
+		},
+		func() bool { return externalSnapshotMetadataAPIEnabled },
 		func() bool { return false },
 	)
 
