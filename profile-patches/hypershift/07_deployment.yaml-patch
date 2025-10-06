@@ -55,3 +55,4 @@
     openshift.storage.network-policy.api-server: allow
     openshift.storage.network-policy.dns: allow
     openshift.storage.network-policy.operator-metrics: allow
+    hypershift.openshift.io/managed-by: cluster-version-operator

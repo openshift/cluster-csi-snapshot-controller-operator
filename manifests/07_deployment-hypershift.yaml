@@ -17,6 +17,7 @@ spec:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: csi-snapshot-controller-operator
+        hypershift.openshift.io/managed-by: cluster-version-operator
         openshift.storage.network-policy.all-egress: allow
         openshift.storage.network-policy.api-server: allow
         openshift.storage.network-policy.dns: allow
