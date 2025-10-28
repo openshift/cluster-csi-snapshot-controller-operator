@@ -3,6 +3,8 @@ apiVersion: apps/v1
 metadata:
   name: csi-snapshot-controller
   namespace: ${CONTROLPLANE_NAMESPACE}
+  annotations:
+    release.openshift.io/desired-version: ${RELEASE_VERSION}
 spec:
   serviceName: "csi-snapshot-controller"
   # Replicas for HyperShift. On standalone OCP it will be adjusted according to nr. of master nodes.
