@@ -6,7 +6,6 @@ metadata:
   labels:
     hypershift.openshift.io/managed-by: csi-snapshot-controller-operator
 spec:
-  serviceName: "csi-snapshot-controller"
   # Replicas for HyperShift. On standalone OCP it will be adjusted according to nr. of master nodes.
   # TODO: adjust according to HostedControlPlane.Spec.AvailabilityPolicy.
   replicas: 1
@@ -36,7 +35,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-      serviceAccount: csi-snapshot-controller
+      serviceAccountName: csi-snapshot-controller
       containers:
         - name: snapshot-controller
           securityContext:

@@ -4,7 +4,6 @@ metadata:
   name: csi-snapshot-webhook
   namespace: ${CONTROLPLANE_NAMESPACE}
 spec:
-  serviceName: "csi-snapshot-webhook"
   selector:
     matchLabels:
       app: csi-snapshot-webhook
@@ -21,7 +20,7 @@ spec:
       labels:
         app: csi-snapshot-webhook
     spec:
-      serviceAccount: csi-snapshot-webhook
+      serviceAccountName: csi-snapshot-webhook
       containers:
       - name: webhook
         image: ${OPERAND_IMAGE}
@@ -36,7 +35,6 @@ spec:
           - name: certs
             mountPath: /etc/snapshot-validation-webhook/certs
             readOnly: true
-            optional: true
         imagePullPolicy: IfNotPresent
         resources:
           requests:
