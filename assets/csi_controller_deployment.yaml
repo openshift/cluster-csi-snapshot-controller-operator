@@ -21,7 +21,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: restricted-v2
+        openshift.io/required-scc: restricted-v3
       labels:
         app: csi-snapshot-controller
         openshift.storage.network-policy.dns: allow
@@ -31,6 +31,7 @@ spec:
         # all-egress network policy to allow reaching the server on any port.
         openshift.storage.network-policy.all-egress: allow
     spec:
+      hostUsers: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:

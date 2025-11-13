@@ -16,10 +16,11 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: restricted-v2
+        openshift.io/required-scc: restricted-v3
       labels:
         app: csi-snapshot-webhook
     spec:
+      hostUsers: false
       serviceAccountName: csi-snapshot-webhook
       containers:
       - name: webhook
