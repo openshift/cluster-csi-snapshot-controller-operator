@@ -18,7 +18,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: restricted-v2
+        openshift.io/required-scc: restricted-v3
       labels:
         app: csi-snapshot-controller-operator
         openshift.storage.network-policy.dns: allow
@@ -77,6 +77,7 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: "NoSchedule"
+      hostUsers: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:
