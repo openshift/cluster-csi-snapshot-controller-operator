@@ -6,6 +6,7 @@ metadata:
   labels:
     hypershift.openshift.io/managed-by: csi-snapshot-controller-operator
 spec:
+  serviceName: "csi-snapshot-controller"
   # Replicas for HyperShift. On standalone OCP it will be adjusted according to nr. of master nodes.
   # TODO: adjust according to HostedControlPlane.Spec.AvailabilityPolicy.
   replicas: 1
@@ -21,7 +22,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: restricted-v3
+        openshift.io/required-scc: restricted-v2
       labels:
         app: csi-snapshot-controller
         openshift.storage.network-policy.dns: allow
@@ -31,12 +32,11 @@ spec:
         # all-egress network policy to allow reaching the server on any port.
         openshift.storage.network-policy.all-egress: allow
     spec:
-      hostUsers: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-      serviceAccountName: csi-snapshot-controller
+      serviceAccount: csi-snapshot-controller
       containers:
         - name: snapshot-controller
           securityContext:
