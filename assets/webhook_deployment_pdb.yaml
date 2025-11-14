@@ -8,4 +8,4 @@ spec:
   selector:
     matchLabels:
       app: csi-snapshot-webhook
-  unhealthyEvictionPolicy: AlwaysAllow
+  unhealthyPodEvictionPolicy: AlwaysAllow
