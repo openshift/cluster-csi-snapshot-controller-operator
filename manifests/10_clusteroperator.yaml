@@ -14,4 +14,55 @@ status:
     version: "0.0.1-snapshot"
   - name: csi-snapshot-controller
     version: "0.0.1-snapshot"
+  relatedObjects:
+    - group: ""
+      name: openshift-cluster-storage-operator
+      resource: namespaces
+    - group: operator.openshift.io
+      name: cluster
+      resource: csisnapshotcontrollers
+    - group: ""
+      name: csi-snapshot-controller-operator
+      namespace: openshift-cluster-storage-operator
+      resource: serviceaccounts
+    - group: rbac.authorization.k8s.io
+      name: openshift-csi-snapshot-controller-runner
+      resource: clusterroles
+    - group: rbac.authorization.k8s.io
+      name: csi-snapshot-controller-operator-clusterrole
+      resource: clusterroles
+    - group: rbac.authorization.k8s.io
+      name: system:openshift:aggregate-snapshots-to-admin
+      resource: clusterroles
+    - group: rbac.authorization.k8s.io
+      name: system:openshift:aggregate-snapshots-to-view
+      resource: clusterroles
+    - group: rbac.authorization.k8s.io
+      name: system:openshift:aggregate-snapshots-to-basic-user
+      resource: clusterroles
+    - group: rbac.authorization.k8s.io
+      name: system:openshift:aggregate-snapshots-to-storage-admin
+      resource: clusterroles
+    - group: rbac.authorization.k8s.io
+      name: csi-snapshot-controller-operator-clusterrole
+      resource: clusterrolebindings
+    - group: rbac.authorization.k8s.io
+      name: csi-snapshot-controller-runner-operator
+      resource: clusterrolebindings
+    - group: rbac.authorization.k8s.io
+      name: csi-snapshot-controller-operator-role
+      namespace: openshift-cluster-storage-operator
+      resource: roles
+    - group: rbac.authorization.k8s.io
+      name: csi-snapshot-controller-operator-role
+      namespace: openshift-cluster-storage-operator
+      resource: rolebindings
+    - group: rbac.authorization.k8s.io
+      name: extension-apiserver-authentication-reader
+      namespace: kube-system
+      resource: roles
+    - group: rbac.authorization.k8s.io
+      name: csi-snapshot-controller-operator-authentication-reader
+      namespace: kube-system
+      resource: rolebindings
 spec: {}
