@@ -49,6 +49,8 @@ spec:
           args:
             - "--v=${LOG_LEVEL}"
             - "--leader-election=true"
+            - "-kube-api-qps=30"
+            - "-kube-api-burst=60"
             # Leader election values are from
             # https://github.com/openshift/library-go/blob/master/pkg/config/leaderelection/leaderelection.go
             - "--leader-election-lease-duration=137s"
