@@ -178,7 +178,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	volumeGroupSnapshotAPIEnabled := featureGates.Enabled(configv1.FeatureGateName("VolumeGroupSnapshot"))
 	externalSnapshotMetadataAPIEnabled := featureGates.Enabled(configv1.FeatureGateName("ExternalSnapshotMetadata"))
 
-	namespacedAssetFunc := namespaceReplacer(assets.ReadFile, "${CONTROLPLANE_NAMESPACE}", controlPlaneNamespace)
+	namespacedAssetFunc := namespaceReplacer(assets.ReadFile, "${CONTROLPLANE_NAMESPACE}", controlPlaneNamespace, "${RELEASE_VERSION}", status.VersionForOperandFromEnv())
 	guestStaticResourceController := staticresourcecontroller.NewStaticResourceController(
 		"CSISnapshotGuestStaticResourceController",
 		namespacedAssetFunc,
@@ -726,13 +726,14 @@ func hyperShiftAddPullSecret() dc.DeploymentHookFunc {
 	}
 }
 
-func namespaceReplacer(assetFunc resourceapply.AssetFunc, placeholder, namespace string) resourceapply.AssetFunc {
+func namespaceReplacer(assetFunc resourceapply.AssetFunc, namespacePlaceholder, namespace, versionPlaceholder, version string) resourceapply.AssetFunc {
 	return func(name string) ([]byte, error) {
 		asset, err := assetFunc(name)
 		if err != nil {
 			return asset, err
 		}
-		asset = bytes.ReplaceAll(asset, []byte(placeholder), []byte(namespace))
+		asset = bytes.ReplaceAll(asset, []byte(namespacePlaceholder), []byte(namespace))
+		asset = bytes.ReplaceAll(asset, []byte(versionPlaceholder), []byte(version))
 		return asset, nil
 	}
 }
