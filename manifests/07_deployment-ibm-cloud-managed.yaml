@@ -18,7 +18,7 @@ spec:
   template:
     metadata:
       annotations:
-        openshift.io/required-scc: restricted-v2
+        openshift.io/required-scc: restricted-v3
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: csi-snapshot-controller-operator
@@ -56,6 +56,7 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         terminationMessagePolicy: FallbackToLogsOnError
+      hostUsers: false
       priorityClassName: system-cluster-critical
       securityContext:
         runAsNonRoot: true
