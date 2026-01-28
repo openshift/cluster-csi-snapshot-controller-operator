@@ -23,6 +23,7 @@ import (
 	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"github.com/openshift/library-go/pkg/operator/events"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
+	"github.com/openshift/library-go/pkg/operator/hypershift/deploymentversion"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
@@ -64,6 +65,10 @@ const (
 
 	resync = 20 * time.Minute
 )
+
+type RunnableController interface {
+	Run(ctx context.Context, workers int)
+}
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigFile string) error {
 	isHyperShift := guestKubeConfigFile != ""
@@ -381,10 +386,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		informer.Start(ctx.Done())
 	}
 
-	klog.Info("Starting the controllers")
-	for _, controller := range []interface {
-		Run(ctx context.Context, workers int)
-	}{
+	// Defining the list of controllers to Run()
+	controllers := []RunnableController{
 		clusterOperatorStatus,
 		logLevelController,
 		managementStateController,
@@ -394,7 +397,22 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestStaticResourceController,
 		controlPlaneStaticResourcesController,
 		webhookRemovalController,
-	} {
+	}
+	if isHyperShift {
+		deploymentVersionController := deploymentversioncontroller.NewDeploymentVersionController(
+			"DeploymentVersionController",
+			controlPlaneNamespace,
+			targetName,
+			controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Apps().V1().Deployments(),
+			guestOperatorClient,
+			controlPlaneKubeClient,
+			eventRecorder)
+
+		controllers = append(controllers, deploymentVersionController)
+	}
+
+	klog.Info("Starting the controllers")
+	for _, controller := range controllers {
 		if controller != nil {
 			go controller.Run(ctx, 1)
 		}
