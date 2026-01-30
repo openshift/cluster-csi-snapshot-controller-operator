@@ -23,6 +23,7 @@ import (
 	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	"github.com/openshift/library-go/pkg/operator/events"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
+	"github.com/openshift/library-go/pkg/operator/hypershift/deploymentversion"
 	"github.com/openshift/library-go/pkg/operator/loglevel"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/managementstatecontroller"
@@ -64,6 +65,10 @@ const (
 
 	resync = 20 * time.Minute
 )
+
+type RunnableController interface {
+	Run(ctx context.Context, workers int)
+}
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext, guestKubeConfigFile string) error {
 	isHyperShift := guestKubeConfigFile != ""
@@ -178,7 +183,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	volumeGroupSnapshotAPIEnabled := featureGates.Enabled(configv1.FeatureGateName("VolumeGroupSnapshot"))
 	externalSnapshotMetadataAPIEnabled := featureGates.Enabled(configv1.FeatureGateName("ExternalSnapshotMetadata"))
 
-	namespacedAssetFunc := namespaceReplacer(assets.ReadFile, "${CONTROLPLANE_NAMESPACE}", controlPlaneNamespace)
+	namespacedAssetFunc := placeholderReplacer(assets.ReadFile, "${CONTROLPLANE_NAMESPACE}", controlPlaneNamespace, "${RELEASE_VERSION}", status.VersionForOperandFromEnv())
 	guestStaticResourceController := staticresourcecontroller.NewStaticResourceController(
 		"CSISnapshotGuestStaticResourceController",
 		namespacedAssetFunc,
@@ -381,10 +386,8 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		informer.Start(ctx.Done())
 	}
 
-	klog.Info("Starting the controllers")
-	for _, controller := range []interface {
-		Run(ctx context.Context, workers int)
-	}{
+	// Defining the list of controllers to Run()
+	controllers := []RunnableController{
 		clusterOperatorStatus,
 		logLevelController,
 		managementStateController,
@@ -394,7 +397,22 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		guestStaticResourceController,
 		controlPlaneStaticResourcesController,
 		webhookRemovalController,
-	} {
+	}
+	if isHyperShift {
+		deploymentVersionController := deploymentversioncontroller.NewDeploymentVersionController(
+			"DeploymentVersionController",
+			controlPlaneNamespace,
+			targetName,
+			controlPlaneInformersForNamespaces.InformersFor(controlPlaneNamespace).Apps().V1().Deployments(),
+			guestOperatorClient,
+			controlPlaneKubeClient,
+			eventRecorder)
+
+		controllers = append(controllers, deploymentVersionController)
+	}
+
+	klog.Info("Starting the controllers")
+	for _, controller := range controllers {
 		if controller != nil {
 			go controller.Run(ctx, 1)
 		}
@@ -726,13 +744,14 @@ func hyperShiftAddPullSecret() dc.DeploymentHookFunc {
 	}
 }
 
-func namespaceReplacer(assetFunc resourceapply.AssetFunc, placeholder, namespace string) resourceapply.AssetFunc {
+func placeholderReplacer(assetFunc resourceapply.AssetFunc, namespacePlaceholder, namespace, versionPlaceholder, version string) resourceapply.AssetFunc {
 	return func(name string) ([]byte, error) {
 		asset, err := assetFunc(name)
 		if err != nil {
 			return asset, err
 		}
-		asset = bytes.ReplaceAll(asset, []byte(placeholder), []byte(namespace))
+		asset = bytes.ReplaceAll(asset, []byte(namespacePlaceholder), []byte(namespace))
+		asset = bytes.ReplaceAll(asset, []byte(versionPlaceholder), []byte(version))
 		return asset, nil
 	}
 }

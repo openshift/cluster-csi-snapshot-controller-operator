@@ -297,7 +297,7 @@ github.com/openshift/client-go/config/listers/config/v1alpha1
 github.com/openshift/client-go/config/listers/config/v1alpha2
 github.com/openshift/client-go/operator/applyconfigurations/internal
 github.com/openshift/client-go/operator/applyconfigurations/operator/v1
-# github.com/openshift/library-go v0.0.0-20251107090138-0de9712313a5
+# github.com/openshift/library-go v0.0.0-20260108002748-aca7ba3a9b69
 ## explicit; go 1.24.0
 github.com/openshift/library-go/pkg/apiserver/jsonpatch
 github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer
@@ -324,6 +324,7 @@ github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontr
 github.com/openshift/library-go/pkg/operator/deploymentcontroller
 github.com/openshift/library-go/pkg/operator/events
 github.com/openshift/library-go/pkg/operator/genericoperatorclient
+github.com/openshift/library-go/pkg/operator/hypershift/deploymentversion
 github.com/openshift/library-go/pkg/operator/loglevel
 github.com/openshift/library-go/pkg/operator/management
 github.com/openshift/library-go/pkg/operator/managementstatecontroller
@@ -499,7 +500,7 @@ go.yaml.in/yaml/v2
 # go.yaml.in/yaml/v3 v3.0.4
 ## explicit; go 1.16
 go.yaml.in/yaml/v3
-# golang.org/x/crypto v0.44.0
+# golang.org/x/crypto v0.45.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
