@@ -18,7 +18,7 @@ spec:
     singular: volumegroupsnapshotclass
   scope: Cluster
   versions:
-# Don't offer v1beta1 API in OCP, everyone must use v1beta2. We don't want to use conversion webhook in OCP.
+# Don't offer v1beta1 or v1beta2 API in OCP, everyone must use v1. We don't want to use conversion webhook in OCP.
 #  - additionalPrinterColumns:
 #    - jsonPath: .driver
 #      name: Driver
@@ -107,7 +107,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1beta2
+    name: v1
     schema:
       openAPIV3Schema:
         description: |-

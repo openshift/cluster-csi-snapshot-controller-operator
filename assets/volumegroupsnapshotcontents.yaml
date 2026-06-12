@@ -28,7 +28,7 @@ spec:
   #          name: snapshot-conversion-webhook-service
   #          path: /convert
   versions:
-# Don't offer v1beta1 API in OCP, everyone must use v1beta2. We don't want to use conversion webhook in OCP.
+# Don't offer v1beta1 or v1beta2 API in OCP, everyone must use v1. We don't want to use conversion webhook in OCP.
 #  - additionalPrinterColumns:
 #    - description: Indicates if all the individual snapshots in the group are ready
 #        to be used to restore a group of volumes.
@@ -369,7 +369,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1beta2
+    name: v1
     schema:
       openAPIV3Schema:
         description: |-
@@ -617,14 +617,10 @@ spec:
                   rule: self == oldSelf
               volumeSnapshotInfoList:
                 description: |-
-                  This field is introduced in v1beta2
-                  It is replacing VolumeSnapshotHandlePairList
                   VolumeSnapshotInfoList is a list of snapshot information returned by
-                  by the CSI driver to identify snapshots on the storage system.
+                  the CSI driver to identify snapshots on the storage system.
                 items:
-                  description: |-
-                    The VolumeSnapshotInfo struct is added in v1beta2
-                    VolumeSnapshotInfo contains information for a snapshot
+                  description: VolumeSnapshotInfo contains information for a snapshot
                   properties:
                     creationTime:
                       description: |-
