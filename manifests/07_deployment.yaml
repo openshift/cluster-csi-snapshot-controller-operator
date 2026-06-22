@@ -30,6 +30,10 @@ spec:
       - name: csi-snapshot-controller-operator
         image: quay.io/openshift/origin-cluster-csi-snapshot-controller-operator:latest
         imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8443
+          name: metrics
+          protocol: TCP
         resources:
           requests:
             memory: 65Mi
@@ -37,6 +41,8 @@ spec:
         volumeMounts:
         - mountPath: /var/run/secrets/serving-cert
           name: serving-cert
+        - mountPath: /var/run/configmaps/config
+          name: config
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -46,6 +52,10 @@ spec:
         args:
         - start
         - -v=2
+        - --config=/var/run/configmaps/config/operator-config.yaml
+        - --terminate-on-files=/var/run/configmaps/config/operator-config.yaml
+        - --terminate-on-files=/var/run/secrets/serving-cert/tls.crt
+        - --terminate-on-files=/var/run/secrets/serving-cert/tls.key
         env:
         - name: OPERAND_IMAGE
           value: quay.io/openshift/origin-csi-snapshot-controller
@@ -62,6 +72,9 @@ spec:
       - name: serving-cert
         secret:
           secretName: serving-cert
+      - name: config
+        configMap:
+          name: csi-snapshot-controller-operator-config
       priorityClassName: "system-cluster-critical"
       nodeSelector:
         node-role.kubernetes.io/master: ""

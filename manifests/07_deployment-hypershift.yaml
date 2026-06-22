@@ -26,6 +26,10 @@ spec:
       - args:
         - start
         - -v=2
+        - --config=/var/run/configmaps/config/operator-config.yaml
+        - --terminate-on-files=/var/run/configmaps/config/operator-config.yaml
+        - --terminate-on-files=/var/run/secrets/serving-cert/tls.crt
+        - --terminate-on-files=/var/run/secrets/serving-cert/tls.key
         - --guest-kubeconfig=/etc/guest-kubeconfig/kubeconfig
         env:
         - name: OPERAND_IMAGE
@@ -41,6 +45,10 @@ spec:
         image: quay.io/openshift/origin-cluster-csi-snapshot-controller-operator:latest
         imagePullPolicy: IfNotPresent
         name: csi-snapshot-controller-operator
+        ports:
+        - containerPort: 8443
+          name: metrics
+          protocol: TCP
         resources:
           requests:
             cpu: 10m
@@ -53,6 +61,10 @@ spec:
           readOnlyRootFilesystem: true
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
+        - mountPath: /var/run/secrets/serving-cert
+          name: serving-cert
+        - mountPath: /var/run/configmaps/config
+          name: config
         - mountPath: /etc/guest-kubeconfig
           name: guest-kubeconfig
       securityContext:
@@ -61,6 +73,12 @@ spec:
           type: RuntimeDefault
       serviceAccountName: csi-snapshot-controller-operator
       volumes:
+      - name: serving-cert
+        secret:
+          secretName: serving-cert
+      - configMap:
+          name: csi-snapshot-controller-operator-config
+        name: config
       - name: guest-kubeconfig
         secret:
           secretName: service-network-admin-kubeconfig
