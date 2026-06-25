@@ -281,6 +281,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			hyperShiftNodeSelectorHook(hcpInformer.Lister(), controlPlaneNamespace),
 			hyperShiftLabelsHook(hcpInformer.Lister(), controlPlaneNamespace),
 			hyperShiftSetSecurityContext(),
+			withVolumeGroupSnapshot(volumeGroupSnapshotAPIEnabled),
 		}
 
 	} else {
