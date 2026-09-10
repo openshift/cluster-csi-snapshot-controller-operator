@@ -60,6 +60,11 @@ spec:
             - "--leader-election-retry-period=26s"
             # Force the namespace name for HyperShift
             - "--leader-election-namespace=openshift-cluster-storage-operator"
+            # VolumeGroupSnapshot is GA and always enabled in OCP, but the
+            # feature gate is still off by default in the snapshot-controller,
+            # so it must be enabled explicitly here.
+            # TODO: remove when the feature gate is enabled by default upstream.
+            - "--feature-gates=CSIVolumeGroupSnapshot=true"
             # guest --kubeconfig= will be injected by the operator when running on HyperShift
           imagePullPolicy: IfNotPresent
           resources:

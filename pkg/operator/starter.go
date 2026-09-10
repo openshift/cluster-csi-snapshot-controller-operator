@@ -180,7 +180,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 
 	// Check whether the following featuregates are enabled or not. These variables will be
 	// used to decided what resources will be deployed in the cluster.
-	volumeGroupSnapshotAPIEnabled := featureGates.Enabled(configv1.FeatureGateName("VolumeGroupSnapshot"))
 	externalSnapshotMetadataAPIEnabled := featureGates.Enabled(configv1.FeatureGateName("ExternalSnapshotMetadata"))
 
 	namespacedAssetFunc := placeholderReplacer(assets.ReadFile, "${CONTROLPLANE_NAMESPACE}", controlPlaneNamespace, "${RELEASE_VERSION}", status.VersionForOperandFromEnv())
@@ -191,19 +190,13 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			"volumesnapshots.yaml",
 			"volumesnapshotcontents.yaml",
 			"volumesnapshotclasses.yaml",
-		},
-		resourceapply.NewKubeClientHolder(guestKubeClient).WithAPIExtensionsClient(guestAPIExtClient),
-		guestOperatorClient,
-		eventRecorder,
-	).WithConditionalResources(
-		namespacedAssetFunc,
-		[]string{
 			"volumegroupsnapshots.yaml",
 			"volumegroupsnapshotcontents.yaml",
 			"volumegroupsnapshotclasses.yaml",
 		},
-		func() bool { return volumeGroupSnapshotAPIEnabled },
-		func() bool { return false },
+		resourceapply.NewKubeClientHolder(guestKubeClient).WithAPIExtensionsClient(guestAPIExtClient),
+		guestOperatorClient,
+		eventRecorder,
 	).WithConditionalResources(
 		namespacedAssetFunc,
 		[]string{
@@ -281,7 +274,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			hyperShiftNodeSelectorHook(hcpInformer.Lister(), controlPlaneNamespace),
 			hyperShiftLabelsHook(hcpInformer.Lister(), controlPlaneNamespace),
 			hyperShiftSetSecurityContext(),
-			withVolumeGroupSnapshot(volumeGroupSnapshotAPIEnabled),
 		}
 
 	} else {
@@ -291,7 +283,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			csidrivercontrollerservicecontroller.WithReplicasHook(
 				guestConfigInformers,
 			),
-			withVolumeGroupSnapshot(volumeGroupSnapshotAPIEnabled),
 		}
 	}
 	controllerDeploymentController := dc.NewDeploymentController(
@@ -754,22 +745,6 @@ func placeholderReplacer(assetFunc resourceapply.AssetFunc, namespacePlaceholder
 		asset = bytes.ReplaceAll(asset, []byte(namespacePlaceholder), []byte(namespace))
 		asset = bytes.ReplaceAll(asset, []byte(versionPlaceholder), []byte(version))
 		return asset, nil
-	}
-}
-
-func withVolumeGroupSnapshot(enabled bool) dc.DeploymentHookFunc {
-	return func(_ *operatorv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		if !enabled {
-			return nil
-		}
-		for i := range deployment.Spec.Template.Spec.Containers {
-			container := &deployment.Spec.Template.Spec.Containers[i]
-			switch container.Name {
-			case "snapshot-controller":
-				container.Args = append(container.Args, "--feature-gates=CSIVolumeGroupSnapshot=true")
-			}
-		}
-		return nil
 	}
 }
 
