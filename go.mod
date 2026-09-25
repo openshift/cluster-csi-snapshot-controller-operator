@@ -4,10 +4,10 @@ go 1.26.0
 
 require (
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0
-	github.com/openshift/api v0.0.0-20260721120239-14262bf791c8
+	github.com/openshift/api v0.0.0-20260923043708-9abfa327cff2
 	github.com/openshift/build-machinery-go v0.0.0-20250530140348-dc5b2804eeee
-	github.com/openshift/client-go v0.0.0-20260721124015-35d8f3c0e847
-	github.com/openshift/library-go v0.0.0-20260721103755-0c9fbc9f043a
+	github.com/openshift/client-go v0.0.0-20260923093432-89e5bba1be29
+	github.com/openshift/library-go v0.0.0-20260925111453-f45916bdd6d7
 	github.com/prometheus/client_golang v1.24.0
 	github.com/spf13/cobra v1.10.2
 	k8s.io/api v0.36.2
